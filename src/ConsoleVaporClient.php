@@ -2,8 +2,6 @@
 
 namespace Diviky\Serverless;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ClientException;
 use Laravel\VaporCli\Aws\AwsStorageProvider;
 use Laravel\VaporCli\ConsoleVaporClient as VaporConsoleVaporClient;
 use Laravel\VaporCli\Helpers;
@@ -21,8 +19,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'id'   => 'aws',
             'name' => 'aws',
         ]];
-
-        return $this->request('get', '/api/teams/' . Helpers::config('team') . '/providers');
     }
 
     /**
@@ -40,8 +36,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 's3' => 'https://s3.com/',
             ],
         ];
-
-        return $this->request('get', '/api/projects/' . $projectId);
     }
 
     /**
@@ -63,12 +57,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 'project' => $name,
             ],
         ];
-
-        return $this->requestWithErrorHandling('post', '/api/teams/' . Helpers::config('team') . '/projects', \array_filter([
-            'cloud_provider_id' => $providerId,
-            'name'              => $name,
-            'region'            => $region,
-        ]));
     }
 
     /**
@@ -90,36 +78,25 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $projectId,
         $uuid,
         $environment,
-        $file,
+        $file = null,
         $commit = null,
         $commitMessage = null,
         $vendorHash = null,
         $cliVersion = null,
         $coreVersion = null
     ) {
-        Serverless::generate($environment);die;
+        Serverless::generate($environment);
+
+        exit;
         //Serverless::deploy();
 
         return [
             'id' => null,
         ];
 
-        $artifact = $this->requestWithErrorHandling('post', '/api/projects/' . $projectId . '/artifacts/' . $environment, [
-            'uuid'           => $uuid,
-            'commit'         => $commit,
-            'commit_message' => $commitMessage,
-            'vendor_hash'    => $vendorHash,
-            'cli_version'    => $cliVersion,
-            'core_version'   => $coreVersion,
-        ]);
+        $artifact = [];
 
         Helpers::app(AwsStorageProvider::class)->store($artifact['url'], [], $file, true);
-
-        try {
-            $this->requestWithErrorHandling('post', '/api/artifacts/' . $artifact['id'] . '/receipt');
-        } catch (ClientException $e) {
-            Helpers::abort('Unable to upload deployment artifact to cloud storage.');
-        }
 
         return $artifact;
     }
@@ -135,32 +112,19 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     protected function requestWithErrorHandling($method, $uri, array $json = [])
     {
         return [];
-
-        try {
-            return $this->request($method, $uri, $json);
-        } catch (ClientException $e) {
-            $response = $e->getResponse();
-
-            if (\in_array($response->getStatusCode(), [400, 422])) {
-                $this->displayValidationErrors($response);
-
-                exit(1);
-            }
-
-            throw $e;
-        }
     }
 
     /**
-     * Get a HTTP client instance.
+     * Make a request to the API and return the resulting JSON array.
      *
-     * @return Client
+     * @param string $method
+     * @param string $uri
+     * @param int    $tries
+     *
+     * @return array
      */
-    protected function client()
+    protected function request($method, $uri, array $json = [], $tries = 0)
     {
-        return new Client([
-            'base_uri' => $_ENV['VAPOR_API_BASE'] ?? \getenv('VAPOR_API_BASE') ?: 'https://vapor.laravel.com',
-            // 'base_uri' => $_ENV['VAPOR_API_BASE'] ?? 'https://laravel-vapor.ngrok.io',
-        ]);
+        return [];
     }
 }

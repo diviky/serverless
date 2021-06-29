@@ -19,10 +19,13 @@ trait ExecuteTrait
     {
         $this->startedAt = new DateTime();
 
+        $_ENV['VAPOR_API_TOKEN'] = \uniqid();
+
         $this->vapor = Helpers::app(ConsoleVaporClient::class);
 
         Helpers::app()->instance('input', $this->input = $input);
         Helpers::app()->instance('output', $this->output = $output);
+        Helpers::app()->instance('manifest', \getcwd() . '/serverless.yml');
 
         $this->configureOutputStyles($output);
 

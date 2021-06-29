@@ -25,9 +25,9 @@ class Serverless
         $env    = $manifest['environments'][$stage];
         $region = $manifest['region'] ?? 'ap-south-1';
 
-        $queue_name    = 'default';
+        $queue_name    = $stage . '_default';
         $name          = $manifest['name'];
-        $cache         = $name . '_cache';
+        $cache         = $name . '_' . $stage . '_cache';
         $layers        = self::toLayers($env['runtime'], $region);
         $env['layers'] = $env['layers'] ?? [];
 
