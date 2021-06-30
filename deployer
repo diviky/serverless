@@ -12,17 +12,21 @@ use Dotenv\Repository\RepositoryBuilder;
 use Illuminate\Container\Container;
 use Laravel\VaporCli\Application;
 
-$dir = __DIR__ . '/..';
+$dir = __DIR__ . '/';
 
-if (!file_exists($dir . '/autoload.php')) {
+if (file_exists($dir . '/autoload.php')) {
     $dir = __DIR__ . '/../vendor';
 }
 
-if (!file_exists($dir . '/autoload.php')) {
-    $dir = __DIR__ . '/../../..';
+if (file_exists($dir . '/../autoload.php')) {
+    $dir = __DIR__ . '/../';
 }
 
-if (!file_exists($dir . '/autoload.php')) {
+if (file_exists($dir . '/../../autoload.php')) {
+    $dir = __DIR__ . '/../../';
+}
+
+if (file_exists($dir . '/vendor/autoload.php')) {
     $dir = __DIR__ . '/vendor';
 }
 
