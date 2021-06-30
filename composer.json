@@ -14,7 +14,7 @@
         }
     ],
     "bin": [
-        "vapors"
+        "deployer"
     ],
     "require": {
         "laravel/vapor-cli": "^1.10"
