@@ -1,6 +1,18 @@
 # Laravel Vapor CLI
 
+## npm packages
+
+```
+npm install -g serverless
+npm install -g serverless-deployment-bucket
+npm install -g serverless-dynamodb-autoscaling
+npm install -g serverless-s3-sync
+npm install -g serverless-plugin-scripts
+
+```
+
 ##
+
 ```
 web
 arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:13
@@ -187,6 +199,7 @@ arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:13
     "last_deployed_at": null
 }
 ```
+
 ```
 DYNAMODB_CACHE_TABLE=vapor_cache
 FILESYSTEM_CLOUD=s3
@@ -207,7 +220,7 @@ SQS_TRIES=3
 VAPOR_ARTIFACT_BUCKET_NAME=vapor-ap-south-1-1606997713
 VAPOR_ARTIFACT_NAME=messaging-d0ce3ff0-a712-4844-b1fc-0e2ccbfcf689
 VAPOR_MAINTENANCE_MODE=false
-VAPOR_MAINTENANCE_MODE_SECRET	
+VAPOR_MAINTENANCE_MODE_SECRET
 VAPOR_SERVERLESS_DB=false
 VAPOR_SSM_PATH=/messaging-production
 VAPOR_SSM_VARIABLES=[]

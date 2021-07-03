@@ -1,6 +1,6 @@
 <?php
 
-namespace Diviky\Serverless\BuildProcess;
+namespace Diviky\Serverless\Concerns;
 
 use Dotenv\Dotenv;
 use Dotenv\Environment\Adapter\EnvConstAdapter as V3EnvConstAdapter;

@@ -2,6 +2,7 @@
 
 namespace Diviky\Serverless\BuildProcess;
 
+use Diviky\Serverless\Concerns\EnvReader;
 use Laravel\VaporCli\BuildProcess\ParticipatesInBuildProcess;
 use Laravel\VaporCli\Helpers;
 

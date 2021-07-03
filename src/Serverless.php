@@ -2,7 +2,7 @@
 
 namespace Diviky\Serverless;
 
-use Diviky\Serverless\BuildProcess\EnvReader;
+use Diviky\Serverless\Concerns\EnvReader;
 use Laravel\VaporCli\Helpers;
 use Laravel\VaporCli\Manifest;
 use Laravel\VaporCli\Path;
@@ -22,23 +22,42 @@ class Serverless
     {
         $manifest = Manifest::current();
 
-        $env    = $manifest['environments'][$stage];
-        $region = $manifest['region'] ?? 'ap-south-1';
+        $env           = $manifest['environments'][$stage];
+        $region        = $manifest['region'] ?? 'ap-south-1';
+        $name          = $manifest['name'];
+        $runtime       = $env['runtime'];
+        $image         = $manifest['name'];
+        $layers        = null;
+        $uuid          = \date('ymdhm');
+
+        $env['layers'] = $env['layers'] ?? [];
 
         $queue_name    = $stage . '_default';
-        $name          = $manifest['name'];
         $cache         = $name . '_' . $stage . '_cache';
-        $layers        = self::toLayers($env['runtime'], $region);
-        $env['layers'] = $env['layers'] ?? [];
+
+        $docker = 'dockerize' == $runtime || 'docker' == $runtime;
+
+        if ($docker) {
+            $layers  = self::toLayers($runtime, $region);
+            $layers  = \array_filter(\array_merge($layers, $env['layers']));
+        }
 
         //arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:11
 
         $yaml = [
-            'org'     => $name,
+            'org'     => $manifest['org'] ?? $name,
             'service' => $name,
         ];
 
-        $secrets = static::getProjectEnv(Path::app(), $stage, '.env');
+        $secrets = [];
+
+        if ($docker) {
+            $secrets = static::getProjectEnv(Path::app(), $stage, '.env.docker');
+        }
+
+        if (empty($secrets)) {
+            $secrets = static::getProjectEnv(Path::app(), $stage, '.env');
+        }
 
         $environment = \array_merge([
             'VAPOR_SSM_PATH'                => '/' . $name,
@@ -62,6 +81,15 @@ class Serverless
             'APP_VANITY_URL'                => '',
         ], $secrets);
 
+        $bucket        = null;
+        $bucket_prefix = null;
+        if (isset($env['assets']) && false !== $env['assets']) {
+            $bucket                   = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
+            $bucket_prefix            = $stage . '/' . $uuid;
+            $environment['MIX_URL']   = 'https://${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
+            $environment['ASSET_URL'] = 'https://${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
+        }
+
         $environment = \array_merge($environment, $env['environment'] ?? []);
 
         $yaml['provider'] = \array_filter([
@@ -78,38 +106,57 @@ class Serverless
                 'maxPreviousDeploymentArtifacts' => 10,
                 'blockPublicAccess'              => true,
             ],
-            'iamRoleStatements' => [[
-                'Effect'   => 'Allow',
-                'Action'   => [
-                    'dynamodb:*',
-                    's3:*',
-                    'ses:*',
-                    'sqs:*',
-                    'kms:Decrypt',
-                    'secretsmanager:GetSecretValue',
-                    'ssm:GetParameters',
-                    'ssm:GetParameter',
-                    'lambda:invokeFunction',
+            'iam' => [
+                'role' => [
+                    'statements' => [[
+                        'Effect'   => 'Allow',
+                        'Action'   => [
+                            'dynamodb:*',
+                            's3:*',
+                            'ses:*',
+                            'sqs:*',
+                            'kms:Decrypt',
+                            'secretsmanager:GetSecretValue',
+                            'ssm:GetParameters',
+                            'ssm:GetParameter',
+                            'lambda:invokeFunction',
+                        ],
+                        'Resource' => '*',
+                    ]],
                 ],
-                'Resource' => '*',
-            ]],
+            ],
             'vpc'               => \array_filter([
                 'subnetIds'        => $env['subnets'] ?? null,
                 'securityGroupIds' => $env['security-groups'] ?? null,
             ]),
         ]);
 
-        $yaml['package'] = [
-            'artifact' => 'app.zip',
-        ];
+        if ($docker) {
+            $yaml['provider']['ecr'] = [
+                'images' => [
+                    $image => [
+                        'path' => Path::app(),
+                    ],
+                    'file' => $stage . '.Dockerfile',
+                ],
+            ];
+        } else {
+            $yaml['package'] = [
+                'artifact' => 'app.zip',
+            ];
+        }
 
-        $web = \array_filter([
+        $yaml['functions'] = [];
+        $yaml['resources'] = [];
+        $yaml['custom']    = [];
+
+        $web = [
             'handler'                => 'vaporHandler.handle',
             'timeout'                => $env['timeout'] ?? 28,
             'memorySize'             => $env['memory'] ?? 1024,
             'reservedConcurrency'    => $env['concurrency'] ?? null,
             'provisionedConcurrency' => $env['capacity'] ?? null,
-            'layers'                 => \array_filter(\array_merge($layers, $env['layers'])),
+            'layers'                 => $layers,
             'events'                 => [
                 ['http' => 'ANY /'],
                 ['http' => 'ANY /{proxy+}'],
@@ -123,7 +170,7 @@ class Serverless
                     ],
                 ]],
             ],
-        ]);
+        ];
 
         $queue = [
             'handler'             => 'vaporHandler.handle',
@@ -133,7 +180,7 @@ class Serverless
             'timeout'                => $env['queue-timeout'] ?? null,
             'memorySize'             => $env['queue-memory'] ?? null,
             'reservedConcurrency'    => $env['queue-concurrency'] ?? null,
-            'layers'                 => \array_filter(\array_merge($layers, $env['layers'])),
+            'layers'                 => $layers,
             'events'                 => [[
                 'sqs' => [
                     'arn'       => '!GetAtt Queues.Arn',
@@ -147,10 +194,10 @@ class Serverless
             'environment' => [
                 'APP_RUNNING_IN_CONSOLE' => 'true',
             ],
-            'timeout'                => $env['cli-timeout'] ?? null,
-            'memorySize'             => $env['cli-memory'] ?? 1024,
-            'layers'                 => \array_filter(\array_merge($layers, $env['layers'])),
-            'events'                 => [[
+            'timeout'    => $env['cli-timeout'] ?? null,
+            'memorySize' => $env['cli-memory'] ?? 1024,
+            'layers'     => $layers,
+            'events'     => [[
                 'schedule' => [
                     'rate'    => 'rate(1 minute)',
                     'enabled' => true,
@@ -161,48 +208,55 @@ class Serverless
         $yaml['plugins'] = [
             'serverless-deployment-bucket',
             'serverless-dynamodb-autoscaling',
+            'serverless-s3-sync',
+            'serverless-plugin-scripts',
         ];
 
-        $yaml['resources'] = [
-            'Resources' => [
-                'Queues'       => [
-                    'Type'       => 'AWS::SQS::Queue',
-                    'Properties' => [
-                        'QueueName'     => $queue_name,
-                        'RedrivePolicy' => [
-                            'maxReceiveCount'     => 3,
-                            'deadLetterTargetArn' => '!GetAtt FailedQueues.Arn',
-                        ],
+        $resources = [];
+
+        if (false !== $env['queues']) {
+            $resources['Queues'] = [
+                'Type'       => 'AWS::SQS::Queue',
+                'Properties' => [
+                    'QueueName'     => $queue_name,
+                    'RedrivePolicy' => [
+                        'maxReceiveCount'     => 3,
+                        'deadLetterTargetArn' => '!GetAtt FailedQueues.Arn',
                     ],
                 ],
-                'FailedQueues' => [
+            ];
+
+            $resources['FailedQueues'] = [
+                'Type'       => 'AWS::SQS::Queue',
+                'Properties' => [
                     'Type'       => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName'              => $queue_name . '_failed',
                         'MessageRetentionPeriod' => (7 * 24 * 60),
                     ],
                 ],
-                'cacheTable' => [
-                    'Type'       => 'AWS::DynamoDB::Table',
-                    'Properties' => [
-                        'TableName'             => $cache,
-                        'AttributeDefinitions'  => [[
-                            'AttributeName' => 'key',
-                            'AttributeType' => 'S',
-                        ]],
-                        'KeySchema'             => [[
-                            'AttributeName' => 'key',
-                            'KeyType'       => 'HASH',
-                        ]],
-                        'BillingMode' => 'PAY_PER_REQUEST',
-                    ],
-                ],
-            ],
-        ];
+            ];
+        }
 
-        if (isset($env['autoscale'])) {
-            $yaml['custom'] = [
-                'capacities' => [[
+        if (isset($environment['CACHE_DRIVER']) && 'dynamodb' == $environment['CACHE_DRIVER']) {
+            $resources['cacheTable'] = [
+                'Type'       => 'AWS::DynamoDB::Table',
+                'Properties' => [
+                    'TableName'             => $cache,
+                    'AttributeDefinitions'  => [[
+                        'AttributeName' => 'key',
+                        'AttributeType' => 'S',
+                    ]],
+                    'KeySchema'             => [[
+                        'AttributeName' => 'key',
+                        'KeyType'       => 'HASH',
+                    ]],
+                    'BillingMode' => 'PAY_PER_REQUEST',
+                ],
+            ];
+
+            if (isset($env['autoscale']) && false !== $env['autoscale']) {
+                $yaml['custom']['capacities'] = [[
                     'table' => 'cacheTable',
                     'read'  => [
                         'minimum' => 1,
@@ -214,18 +268,61 @@ class Serverless
                         'maximum' => 200,
                         'usage'   => 0.5,
                     ],
-                ]],
+                ]];
+            }
+        }
+
+        if (isset($bucket)) {
+            $yaml['custom']['s3Sync'] = [[
+                'bucketName'   => $bucket,
+                'bucketPrefix' => $bucket_prefix,
+                'localDir'     => 'assets',
+                'acl'          => 'public-read',
+            ]];
+
+            $resources['AssetsBucket'] = [
+                'Type'       => 'AWS::S3::Bucket',
+                'Properties' => [
+                    'BucketName'    => $bucket,
+                    'AccessControl' => 'PublicRead',
+                ],
             ];
         }
 
-        $yaml['functions']['web'] = $web;
+        $yaml['resources'] = ['Resources' => $resources];
 
-        if (false !== $env['queues']) {
-            $yaml['functions']['queue'] = $queue;
+        if (!isset($env['web']) || false !== $env['web']) {
+            if ($docker) {
+                $web['image'] = [
+                    'name' => $image,
+                ];
+
+                unset($web['handler'], $web['layers']);
+            }
+
+            $yaml['functions']['web'] = \array_filter($web);
         }
 
-        if (false !== $env['scheduler']) {
-            $yaml['functions']['schedule'] = $schedule;
+        if (isset($env['queues']) && false !== $env['queues']) {
+            if ($docker) {
+                $queue['image'] = [
+                    'name' => $image,
+                ];
+
+                unset($queue['handler'], $queue['layers']);
+            }
+            $yaml['functions']['queue'] = \array_filter($queue);
+        }
+
+        if (isset($env['scheduler']) && false !== $env['scheduler']) {
+            if ($docker) {
+                $schedule['image'] = [
+                    'name' => $image,
+                ];
+
+                unset($schedule['handler'], $schedule['layers']);
+            }
+            $yaml['functions']['schedule'] = \array_filter($schedule);
         }
 
         static::write(\array_filter($yaml));
@@ -271,7 +368,8 @@ class Serverless
 
         $layers   = static::layers();
         $runtime  = \str_replace('.', '', $runtime);
-        $layer    = $layers[$runtime][$region];
+        $layer    = isset($layers[$runtime]) ? $layers[$runtime] : [];
+        $layer    = isset($layer[$region]) ? $layer[$region] : null;
 
         return !\is_array($layer) ? [$layer] : $layer;
     }
