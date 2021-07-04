@@ -46,7 +46,7 @@ class BuildCommand extends VaporBuildCommand
             new CopyApplicationToBuildPath(),
             new CollectSecrets($this->argument('environment')),
             new HarmonizeConfigurationFiles(),
-            new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
+            //new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
             new ExecuteBuildCommands($this->argument('environment')),
             new ConfigureArtisan($this->argument('environment')),
             new ConfigureComposerAutoloader($this->argument('environment')),
