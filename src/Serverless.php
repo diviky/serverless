@@ -139,8 +139,8 @@ class Serverless
                 'images' => [
                     $image => [
                         'path' => Path::app(),
+                        'file' => $stage . '.Dockerfile',
                     ],
-                    'file' => $stage . '.Dockerfile',
                 ],
             ];
         } else {
