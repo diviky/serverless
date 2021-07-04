@@ -87,29 +87,8 @@ $app = new Application('Laravel Vapor', '1.22.1');
 
 // Projects...
 $app->add(new Commands\InitCommand());
-$app->add(new Commands\UiCommand());
-
 // Deployments...
-$app->add(new Commands\DeployListCommand());
 $app->add(new Commands\BuildCommand());
 $app->add(new Commands\DeployCommand());
-$app->add(new Commands\RedeployCommand());
-$app->add(new Commands\HookLogCommand());
-
-// Rollbacks / Maintenance Mode...
-$app->add(new Commands\RollbackCommand());
-$app->add(new Commands\DownCommand());
-
-// Commands / Invocations...
-$app->add(new Commands\CommandCommand());
-$app->add(new Commands\CommandLogCommand());
-$app->add(new Commands\TinkerCommand());
-
-// Logs...
-$app->add(new Commands\TailCommand());
-
-// Docker...
-$app->add(new Commands\LocalCommand());
-$app->add(new Commands\TestCommand());
 
 $app->run();

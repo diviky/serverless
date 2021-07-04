@@ -4,6 +4,7 @@ namespace Diviky\Serverless\Commands;
 
 use DateTime;
 use Diviky\Serverless\BuildProcess\CollectSecrets;
+use Diviky\Serverless\Concerns\ExecuteTrait;
 use Laravel\VaporCli\BuildProcess\BuildContainerImage;
 use Laravel\VaporCli\BuildProcess\CompressApplication;
 use Laravel\VaporCli\BuildProcess\CompressVendor;

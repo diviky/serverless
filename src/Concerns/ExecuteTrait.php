@@ -1,6 +1,6 @@
 <?php
 
-namespace Diviky\Serverless\Commands;
+namespace Diviky\Serverless\Concerns;
 
 use DateTime;
 use Diviky\Serverless\ConsoleVaporClient;

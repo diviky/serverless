@@ -2,7 +2,7 @@
 
 namespace Diviky\Serverless\Commands;
 
-use Diviky\Serverless\Commands\ExecuteTrait;
+use Diviky\Serverless\Concerns\ExecuteTrait;
 use Laravel\VaporCli\Commands\DeployCommand as VaporDeployCommand;
 
 class DeployCommand extends VaporDeployCommand
