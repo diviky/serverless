@@ -67,11 +67,6 @@ class Serverless
             'VAPOR_MAINTENANCE_MODE_SECRET' => 'secret',
             'VAPOR_ENVIRONMENT'             => $stage,
             'VAPOR_PROJECT'                 => $name,
-            'QUEUE_CONNECTION'              => 'sqs',
-            'SESSION_DRIVER'                => 'cookie',
-            'CACHE_DRIVER'                  => 'dynamodb',
-            'DYNAMODB_CACHE_TABLE'          => $cache,
-            'SQS_QUEUE'                     => $queue_name,
             'LOG_CHANNEL'                   => 'stderr',
             'LOG_STDERR_FORMATTER'          => 'Laravel\Vapor\Logging\JsonFormatter',
             'APP_CONFIG_CACHE'              => '/tmp/storage/bootstrap/cache/config.php',
@@ -80,6 +75,14 @@ class Serverless
             'XDG_CONFIG_HOME'               => '/tmp',
             'APP_VANITY_URL'                => '',
         ], $secrets);
+
+        $environment = \array_merge([
+            'QUEUE_CONNECTION'              => 'sqs',
+            'SESSION_DRIVER'                => 'cookie',
+            'CACHE_DRIVER'                  => 'dynamodb',
+            'DYNAMODB_CACHE_TABLE'          => $cache,
+            'SQS_QUEUE'                     => $queue_name,
+        ], $environment);
 
         $bucket        = null;
         $bucket_prefix = null;

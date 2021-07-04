@@ -43,8 +43,9 @@ class BuildCommand extends VaporBuildCommand
         collect([
             new ValidateManifest($this->argument('environment')),
             new CopyApplicationToBuildPath(),
+            new CollectSecrets($this->argument('environment')),
             new HarmonizeConfigurationFiles(),
-            //new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
+            new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
             new ExecuteBuildCommands($this->argument('environment')),
             new ConfigureArtisan($this->argument('environment')),
             new ConfigureComposerAutoloader($this->argument('environment')),
@@ -53,13 +54,12 @@ class BuildCommand extends VaporBuildCommand
             new ProcessAssets($this->option('asset-url')),
             new ExtractAssetsToSeparateDirectory(),
             new InjectHandlers($this->argument('environment')),
-            new CollectSecrets($this->argument('environment')),
             new InjectErrorPages(),
             new InjectRdsCertificate(),
             new ExtractVendorToSeparateDirectory($this->argument('environment')),
             new CompressApplication($this->argument('environment')),
             new CompressVendor($this->argument('environment')),
-            new BuildContainerImage($this->argument('environment')),
+            //new BuildContainerImage($this->argument('environment')),
         ])->each->__invoke();
 
         $time = (new DateTime())->diff($startedAt)->format('%im%Ss');
