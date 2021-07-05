@@ -1,0 +1,60 @@
+id: mobtexting
+org: mobtexting
+name: whatsapp
+ignore:
+  - database
+  - docker
+  - scripts
+  - resources/themes/tabler/assets
+  - resources/assets
+  - storage/geoip
+  - git
+  - pull
+  - optimize
+  - tag
+  - tests
+  - "*.dat"
+  - "*.mmdb"
+  - vendor/*.js
+  - vendor/pragmarx/support/src/GeoIp/GeoLiteCity.dat
+  - vendor/pragmarx/support/src/GeoIp/GeoLite2-City.mmdb
+  - .env.docker
+environments:
+  production:
+    memory: 1024
+    cli-memory: 512
+    #runtime: php-7.4
+    runtime: docker
+    assets: com.whatsapp.ap-south-1.assets
+    asset-bucket: true # create aws bucket
+    warm: 10
+    timeout: 30
+    scheduler: false
+    queues: false
+    cloudfront: false
+    subnets:
+      - subnet-xxxx
+    security-groups:
+      - sg-xxx
+    build:
+      - "COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MIRROR_PATH_REPOS=1 COMPOSER=composer.json composer install --no-dev --prefer-dist --classmap-authoritative"
+      - "php artisan event:cache"
+      - "php artisan route:cache"
+  staging:
+    memory: 512
+    cli-memory: 512
+    #runtime: php-7.4
+    runtime: docker
+    assets: true
+    timeout: 30
+    scheduler: false
+    queues: false
+    cloudfront: false
+    subnets:
+      - subnet-xxxx
+    security-groups:
+      - sg-xxx
+    build:
+      - "COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MIRROR_PATH_REPOS=1 COMPOSER=composer.json composer install --no-dev --prefer-dist --no-interaction --classmap-authoritative"
+      - "php artisan event:cache"
+      - "php artisan route:cache"

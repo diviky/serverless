@@ -283,13 +283,15 @@ class Serverless
                 'acl'          => 'public-read',
             ]];
 
-            $resources['AssetsBucket'] = [
-                'Type'       => 'AWS::S3::Bucket',
-                'Properties' => [
-                    'BucketName'    => $bucket,
-                    'AccessControl' => 'PublicRead',
-                ],
-            ];
+            if (isset($env['asset-bucket']) && false !== $env['asset-bucket']) {
+                $resources['AssetsBucket'] = [
+                    'Type'       => 'AWS::S3::Bucket',
+                    'Properties' => [
+                        'BucketName'    => $bucket,
+                        'AccessControl' => 'PublicRead',
+                    ],
+                ];
+            }
         }
 
         $yaml['resources'] = ['Resources' => $resources];
