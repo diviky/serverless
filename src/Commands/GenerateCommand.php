@@ -17,7 +17,7 @@ class GenerateCommand extends VaporBuildCommand
      */
     public function handle()
     {
-        Serverless::generate();
+        Serverless::generate($this->argument('environment'));
 
         Helpers::line();
         Helpers::line('<info>Serverless file created successfully.</info>');

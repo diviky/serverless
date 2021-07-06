@@ -114,6 +114,7 @@ class Serverless
                     'statements' => [[
                         'Effect'   => 'Allow',
                         'Action'   => [
+                            'route53:*',
                             'dynamodb:*',
                             's3:*',
                             'ses:*',
@@ -123,6 +124,10 @@ class Serverless
                             'ssm:GetParameters',
                             'ssm:GetParameter',
                             'lambda:invokeFunction',
+                            'acm:ListCertificates',
+                            'apigateway:*',
+                            'cloudformation:GET',
+                            'cloudfront:UpdateDistribution',
                         ],
                         'Resource' => '*',
                     ]],
@@ -210,9 +215,6 @@ class Serverless
 
         $yaml['plugins'] = [
             'serverless-deployment-bucket',
-            'serverless-dynamodb-autoscaling',
-            'serverless-s3-sync',
-            'serverless-plugin-scripts',
         ];
 
         $resources = [];
@@ -272,6 +274,8 @@ class Serverless
                         'usage'   => 0.5,
                     ],
                 ]];
+
+                \array_push($yaml['plugins'], 'serverless-dynamodb-autoscaling');
             }
         }
 
@@ -292,6 +296,29 @@ class Serverless
                     ],
                 ];
             }
+
+            \array_push($yaml['plugins'], 'serverless-s3-sync');
+        }
+
+        if (isset($env['domain']) && false !== $env['domain']) {
+            $domain = $env['domain'];
+
+            if ('*.' == \substr($domain, 0, 2)) {
+                $domain = '${opt:RANDOM_STRING}.' . \substr($domain, 2, -1);
+            }
+
+            $domain = \str_replace('*', '${opt:RANDOM_STRING}', $domain);
+
+            $yaml['custom']['customDomain'] = \array_filter([
+                'domainName'           => $domain,
+                'stage'                => '${self:provider.stage}',
+                'createRoute53Record'  => 'true',
+                'autoDomain'           => 'true',
+                'endpointType'         => $env['endpoint'] ?? 'regional',
+                'certificateName'      => $env['certificate'] ?? null,
+            ]);
+
+            \array_push($yaml['plugins'], 'serverless-domain-manager');
         }
 
         $yaml['resources'] = ['Resources' => $resources];
