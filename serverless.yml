@@ -1,6 +1,7 @@
 id: mobtexting
 org: mobtexting
 name: whatsapp
+region: ap-south-1
 ignore:
   - database
   - docker
@@ -32,6 +33,8 @@ environments:
     scheduler: false
     queues: false
     cloudfront: false
+    volumes:
+      - /mnt/storage:fsap-0a31095162dd0ca44
     subnets:
       - subnet-xxxx
     security-groups:
@@ -50,6 +53,8 @@ environments:
     scheduler: false
     queues: false
     cloudfront: false
+    volumes:
+      - /mnt/storage:fsap-0a31095162dd0ca44
     subnets:
       - subnet-xxxx
     security-groups:

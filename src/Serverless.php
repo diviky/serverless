@@ -29,6 +29,7 @@ class Serverless
         $image         = $manifest['name'];
         $layers        = null;
         $uuid          = \date('ymdhm');
+        $account_id    = $manifest['id'];
 
         $env['layers'] = $env['layers'] ?? [];
 
@@ -105,7 +106,7 @@ class Serverless
                 'shouldStartNameWithService' => true,
             ],
             'deploymentBucket'  => [
-                'name'                           => 'com.${self:org}.${self:provider.region}.deploys',
+                'name'                           => $env['deployment-bucket'] ?? 'com.${self:org}.${self:provider.region}.deploys',
                 'maxPreviousDeploymentArtifacts' => 10,
                 'blockPublicAccess'              => true,
             ],
@@ -192,7 +193,7 @@ class Serverless
             'events'                 => [[
                 'sqs' => [
                     'arn'       => '!GetAtt Queues.Arn',
-                    'batchSize' => 1,
+                    'batchSize' => $env['queue-size'] ?? 1,
                 ],
             ]],
         ];
@@ -323,6 +324,24 @@ class Serverless
 
         $yaml['resources'] = ['Resources' => $resources];
 
+        $fs = null;
+        if (isset($env['volumes']) && \count($env['volumes']) > 0) {
+            foreach ($env['volumes'] as $volume) {
+                list($local, $access_point) = \explode(':', $volume);
+
+                if ('arn:' != \substr($access_point, 0, 4)) {
+                    $access_point = 'arn:aws:elasticfilesystem:${self:provider.region}:' . $account_id . ':access-point/' . $access_point;
+                }
+
+                $fs = [
+                    'localMountPath' => $local,
+                    'arn'            => $access_point,
+                ];
+            }
+
+            //\array_push($yaml['plugins'], 'serverless-pseudo-parameters');
+        }
+
         if (!isset($env['web']) || false !== $env['web']) {
             if ($docker) {
                 $web['image'] = [
@@ -330,6 +349,10 @@ class Serverless
                 ];
 
                 unset($web['handler'], $web['layers']);
+            }
+
+            if (isset($fs) && \is_array($fs)) {
+                $web['fileSystemConfig'] = $fs;
             }
 
             $yaml['functions']['web'] = \array_filter($web);
@@ -343,6 +366,11 @@ class Serverless
 
                 unset($queue['handler'], $queue['layers']);
             }
+
+            if (isset($fs) && \is_array($fs)) {
+                $web['fileSystemConfig'] = $fs;
+            }
+
             $yaml['functions']['queue'] = \array_filter($queue);
         }
 
@@ -354,6 +382,11 @@ class Serverless
 
                 unset($schedule['handler'], $schedule['layers']);
             }
+
+            if (isset($fs) && \is_array($fs)) {
+                $web['fileSystemConfig'] = $fs;
+            }
+
             $yaml['functions']['schedule'] = \array_filter($schedule);
         }
 
