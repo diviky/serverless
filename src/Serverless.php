@@ -31,14 +31,14 @@ class Serverless
         $uuid          = \date('ymdhm');
         $account_id    = $manifest['id'];
 
-        $env['layers'] = $env['layers'] ?? [];
-
         $queue_name    = $stage . '_default';
         $cache         = $name . '_' . $stage . '_cache';
 
         $docker = 'dockerize' == $runtime || 'docker' == $runtime;
 
-        if ($docker) {
+        $env['layers'] = $env['layers'] ?? [];
+
+        if (!$docker) {
             $layers  = self::toLayers($runtime, $region);
             $layers  = \array_filter(\array_merge($layers, $env['layers']));
         }
@@ -348,6 +348,10 @@ class Serverless
                     'name' => $image,
                 ];
 
+                $web['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
+                $web['EntryPoint']       = $env['entry-point'] ?? null;
+                $web['Command']          = $env['cmd'] ?? null;
+
                 unset($web['handler'], $web['layers']);
             }
 
@@ -364,11 +368,15 @@ class Serverless
                     'name' => $image,
                 ];
 
+                $queue['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
+                $queue['EntryPoint']       = $env['entry-point'] ?? null;
+                $queue['Command']          = $env['cmd'] ?? null;
+
                 unset($queue['handler'], $queue['layers']);
             }
 
             if (isset($fs) && \is_array($fs)) {
-                $web['fileSystemConfig'] = $fs;
+                $queue['fileSystemConfig'] = $fs;
             }
 
             $yaml['functions']['queue'] = \array_filter($queue);
@@ -380,12 +388,18 @@ class Serverless
                     'name' => $image,
                 ];
 
+                $schedule['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
+                $schedule['EntryPoint']       = $env['entry-point'] ?? null;
+                $schedule['Command']          = $env['cmd'] ?? null;
+
                 unset($schedule['handler'], $schedule['layers']);
             }
 
             if (isset($fs) && \is_array($fs)) {
-                $web['fileSystemConfig'] = $fs;
+                $schedule['fileSystemConfig'] = $fs;
             }
+
+            $schedule['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
 
             $yaml['functions']['schedule'] = \array_filter($schedule);
         }

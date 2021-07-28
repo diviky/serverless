@@ -24,8 +24,11 @@ environments:
   production:
     memory: 1024
     cli-memory: 512
-    #runtime: php-7.4
+    #runtime: php-7.4:2la
     runtime: docker
+    #cmd: null #Specifies parameters that you want to pass in with ENTRYPOINT.
+    #entry-point: null #Specifies the entry point to their application, which is typically the location of the runtime executable.
+    #working-dir: /var/task
     assets: com.whatsapp.ap-south-1.assets
     asset-bucket: true # create aws bucket
     warm: 10
@@ -46,7 +49,7 @@ environments:
   staging:
     memory: 512
     cli-memory: 512
-    #runtime: php-7.4
+    #runtime: php-7.4:2la
     runtime: docker
     assets: true
     timeout: 30

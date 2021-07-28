@@ -1,22 +1,8 @@
 {
     "php-74": {
-        "ca-central-1": "14",
-        "eu-central-1": "14",
-        "eu-north-1": "15",
-        "eu-west-1": "14",
-        "eu-west-2": "14",
-        "eu-west-3": "14",
-        "sa-east-1": "14",
-        "us-east-1": "14",
-        "us-east-2": "14",
-        "us-west-1": "14",
-        "us-west-2": "14",
-        "ap-south-1": "arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:13",
-        "ap-northeast-1": "13",
-        "ap-northeast-2": "13",
-        "ap-southeast-1": "13",
-        "ap-southeast-2": "13",
-        "eu-south-1": "4",
-        "af-south-1": "4"
+        "ap-south-1": "arn:aws:lambda:ap-south-1:097427577457:layer:vapor-php-74:3"
+    },
+    "php-74:al2": {
+        "ap-south-1": "arn:aws:lambda:ap-south-1:097427577457:layer:php-74al2:1"
     }
 }
