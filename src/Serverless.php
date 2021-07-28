@@ -345,12 +345,11 @@ class Serverless
         if (!isset($env['web']) || false !== $env['web']) {
             if ($docker) {
                 $web['image'] = [
-                    'name' => $image,
+                    'name'             => $image,
+                    'WorkingDirectory' => $env['working-dir'] ?? '/var/task',
+                    'command'          => $env['cmd'] ?? null,
+                    'entryPoint'       => $env['entry-point'] ?? null,
                 ];
-
-                $web['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
-                $web['EntryPoint']       = $env['entry-point'] ?? null;
-                $web['Command']          = $env['cmd'] ?? null;
 
                 unset($web['handler'], $web['layers']);
             }
@@ -365,12 +364,11 @@ class Serverless
         if (isset($env['queues']) && false !== $env['queues']) {
             if ($docker) {
                 $queue['image'] = [
-                    'name' => $image,
+                    'name'             => $image,
+                    'WorkingDirectory' => $env['working-dir'] ?? '/var/task',
+                    'command'          => $env['cmd'] ?? null,
+                    'entryPoint'       => $env['entry-point'] ?? null,
                 ];
-
-                $queue['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
-                $queue['EntryPoint']       = $env['entry-point'] ?? null;
-                $queue['Command']          = $env['cmd'] ?? null;
 
                 unset($queue['handler'], $queue['layers']);
             }
@@ -385,12 +383,11 @@ class Serverless
         if (isset($env['scheduler']) && false !== $env['scheduler']) {
             if ($docker) {
                 $schedule['image'] = [
-                    'name' => $image,
+                    'name'             => $image,
+                    'WorkingDirectory' => $env['working-dir'] ?? '/var/task',
+                    'command'          => $env['cmd'] ?? null,
+                    'entryPoint'       => $env['entry-point'] ?? null,
                 ];
-
-                $schedule['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
-                $schedule['EntryPoint']       = $env['entry-point'] ?? null;
-                $schedule['Command']          = $env['cmd'] ?? null;
 
                 unset($schedule['handler'], $schedule['layers']);
             }
