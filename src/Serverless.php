@@ -346,7 +346,7 @@ class Serverless
             if ($docker) {
                 $web['image'] = [
                     'name'             => $image,
-                    'WorkingDirectory' => $env['working-dir'] ?? '/var/task',
+                    'workingDirectory' => $env['working-dir'] ?? '/var/task',
                     'command'          => $env['cmd'] ?? null,
                     'entryPoint'       => $env['entry-point'] ?? null,
                 ];
@@ -365,7 +365,7 @@ class Serverless
             if ($docker) {
                 $queue['image'] = [
                     'name'             => $image,
-                    'WorkingDirectory' => $env['working-dir'] ?? '/var/task',
+                    'workingDirectory' => $env['working-dir'] ?? '/var/task',
                     'command'          => $env['cmd'] ?? null,
                     'entryPoint'       => $env['entry-point'] ?? null,
                 ];
@@ -384,7 +384,7 @@ class Serverless
             if ($docker) {
                 $schedule['image'] = [
                     'name'             => $image,
-                    'WorkingDirectory' => $env['working-dir'] ?? '/var/task',
+                    'workingDirectory' => $env['working-dir'] ?? '/var/task',
                     'command'          => $env['cmd'] ?? null,
                     'entryPoint'       => $env['entry-point'] ?? null,
                 ];
@@ -395,8 +395,6 @@ class Serverless
             if (isset($fs) && \is_array($fs)) {
                 $schedule['fileSystemConfig'] = $fs;
             }
-
-            $schedule['WorkingDirectory'] = $env['working-dir'] ?? '/var/task';
 
             $yaml['functions']['schedule'] = \array_filter($schedule);
         }
