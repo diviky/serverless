@@ -29,6 +29,8 @@ environments:
     #cmd: null #Specifies parameters array that you want to pass in with ENTRYPOINT.
     #entry-point: null #Specifies the entry point array to their application, which is typically the location of the runtime executable.
     #working-dir: /var/task
+    environment:
+      #- APP_CONFIG_CACHE=/mnt/local/storage/bootstrap/cache/config.php
     assets: com.whatsapp.ap-south-1.assets
     asset-bucket: true # create aws bucket
     warm: 10
@@ -56,6 +58,8 @@ environments:
     scheduler: false
     queues: false
     cloudfront: false
+    environment:
+      #- APP_CONFIG_CACHE=/mnt/local/storage/bootstrap/cache/config.php
     volumes:
       - /mnt/storage:fsap-0a31095162dd0ca44
     subnets:

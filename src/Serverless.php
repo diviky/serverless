@@ -94,7 +94,7 @@ class Serverless
             $environment['ASSET_URL'] = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
         }
 
-        $environment = \array_merge($environment, $env['environment'] ?? []);
+        $environment = \array_merge($environment, self::envVarsToArray($env['environment']));
 
         $yaml['provider'] = \array_filter([
             'name'              => 'aws',
@@ -455,5 +455,22 @@ class Serverless
         }
 
         return [];
+    }
+
+    protected static function envVarsToArray($environments)
+    {
+        if (!\is_array($environments)) {
+            return [];
+        }
+
+        $variables = [];
+        foreach ($environments as $environment) {
+            if (false !== \strpos($environment, '=')) {
+                list($key, $value) = \explode('=', $environment, 2);
+                $variables[$key]   = $value;
+            }
+        }
+
+        return $variables;
     }
 }
