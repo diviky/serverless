@@ -145,7 +145,7 @@ class Serverless
                 'images' => [
                     $image => [
                         'path' => Path::app(),
-                        'file' => $stage . '.Dockerfile',
+                        'file' => file_exists($stage . '.Dockerfile') ? $stage . '.Dockerfile' : '.Dockerfile',
                     ],
                 ],
             ];
