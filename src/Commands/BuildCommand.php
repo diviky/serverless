@@ -19,7 +19,7 @@ use Laravel\VaporCli\BuildProcess\InjectErrorPages;
 use Laravel\VaporCli\BuildProcess\InjectHandlers;
 use Laravel\VaporCli\BuildProcess\InjectRdsCertificate;
 use Laravel\VaporCli\BuildProcess\ProcessAssets;
-use Laravel\VaporCli\BuildProcess\RemoveIgnoredFiles;
+use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
 use Laravel\VaporCli\BuildProcess\RemoveVendorPlatformCheck;
 use Laravel\VaporCli\BuildProcess\SetBuildEnvironment;
 use Laravel\VaporCli\BuildProcess\ValidateManifest;
