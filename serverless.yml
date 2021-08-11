@@ -26,6 +26,7 @@ environments:
     cli-memory: 512
     #runtime: php-7.4:2la
     runtime: docker
+    #image: php7-fpm # custom docker image
     #cmd: null #Specifies parameters array that you want to pass in with ENTRYPOINT.
     #entry-point: null #Specifies the entry point array to their application, which is typically the location of the runtime executable.
     #working-dir: /var/task

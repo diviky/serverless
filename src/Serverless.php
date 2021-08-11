@@ -61,7 +61,7 @@ class Serverless
         }
 
         $environment = \array_merge([
-            'VAPOR_SSM_PATH'                => '/' . $name,
+            'VAPOR_SSM_PATH'                => $env['ssm'] ?? $name,
             'VAPOR_SSM_VARIABLES'           => '[]',
             'VAPOR_SERVERLESS_DB'           => 'false',
             'VAPOR_MAINTENANCE_MODE'        => 'false',
@@ -141,14 +141,16 @@ class Serverless
         ]);
 
         if ($docker) {
-            $yaml['provider']['ecr'] = [
-                'images' => [
-                    $image => [
-                        'path' => Path::app(),
-                        'file' => file_exists($stage . '.Dockerfile') ? $stage . '.Dockerfile' : '.Dockerfile',
+            if (!isset($env['image'])) {
+                $yaml['provider']['ecr'] = [
+                    'images' => [
+                        $image => [
+                            'path' => Path::app(),
+                            'file' => file_exists($stage . '.Dockerfile') ? $stage . '.Dockerfile' : '.Dockerfile',
+                        ],
                     ],
-                ],
-            ];
+                ];
+            }
         } else {
             $yaml['package'] = [
                 'artifact' => 'app.zip',
@@ -344,12 +346,16 @@ class Serverless
 
         if (!isset($env['web']) || false !== $env['web']) {
             if ($docker) {
-                $web['image'] = [
-                    'name'             => $image,
-                    'workingDirectory' => $env['working-dir'] ?? '/var/task',
-                    'command'          => $env['cmd'] ?? null,
-                    'entryPoint'       => $env['entry-point'] ?? null,
-                ];
+                if (isset($env['image'])) {
+                    $web['image'] = $env['image'];
+                } else {
+                    $web['image'] = [
+                        'name'             => $image,
+                        'workingDirectory' => $env['working-dir'] ?? '/var/task',
+                        'command'          => $env['cmd'] ?? null,
+                        'entryPoint'       => $env['entry-point'] ?? null,
+                    ];
+                }
 
                 unset($web['handler'], $web['layers']);
             }
@@ -363,12 +369,16 @@ class Serverless
 
         if (isset($env['queues']) && false !== $env['queues']) {
             if ($docker) {
-                $queue['image'] = [
-                    'name'             => $image,
-                    'workingDirectory' => $env['working-dir'] ?? '/var/task',
-                    'command'          => $env['cmd'] ?? null,
-                    'entryPoint'       => $env['entry-point'] ?? null,
-                ];
+                if (isset($env['image'])) {
+                    $queue['image'] = $env['image'];
+                } else {
+                    $queue['image'] = [
+                        'name'             => $image,
+                        'workingDirectory' => $env['working-dir'] ?? '/var/task',
+                        'command'          => $env['cmd'] ?? null,
+                        'entryPoint'       => $env['entry-point'] ?? null,
+                    ];
+                }
 
                 unset($queue['handler'], $queue['layers']);
             }
@@ -382,12 +392,16 @@ class Serverless
 
         if (isset($env['scheduler']) && false !== $env['scheduler']) {
             if ($docker) {
-                $schedule['image'] = [
-                    'name'             => $image,
-                    'workingDirectory' => $env['working-dir'] ?? '/var/task',
-                    'command'          => $env['cmd'] ?? null,
-                    'entryPoint'       => $env['entry-point'] ?? null,
-                ];
+                if (isset($env['image'])) {
+                    $schedule['image'] = $env['image'];
+                } else {
+                    $schedule['image'] = [
+                        'name'             => $image,
+                        'workingDirectory' => $env['working-dir'] ?? '/var/task',
+                        'command'          => $env['cmd'] ?? null,
+                        'entryPoint'       => $env['entry-point'] ?? null,
+                    ];
+                }
 
                 unset($schedule['handler'], $schedule['layers']);
             }
