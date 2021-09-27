@@ -90,8 +90,7 @@ class Serverless
         if (isset($env['assets']) && false !== $env['assets']) {
             $bucket                   = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
             $bucket_prefix            = $stage . '/' . $uuid;
-            $environment['MIX_URL']   = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
-            $environment['ASSET_URL'] = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
+            $environment['MIX_ASSET_URL']   = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
         }
 
         $environment = \array_merge($environment, self::envVarsToArray($env['environment']));
