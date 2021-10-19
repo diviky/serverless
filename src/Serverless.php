@@ -88,12 +88,12 @@ class Serverless
         $bucket        = null;
         $bucket_prefix = null;
         if (isset($env['assets']) && false !== $env['assets']) {
-            $bucket                   = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
-            $bucket_prefix            = $stage . '/' . $uuid;
+            $bucket                         = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
+            $bucket_prefix                  = $stage . '/' . $uuid;
             $environment['MIX_ASSET_URL']   = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
         }
 
-        $environment = \array_merge($environment, self::envVarsToArray($env['environment']));
+        $environment = \array_merge($environment, self::envVarsToArray($env['environment'] ?? null));
 
         $yaml['provider'] = \array_filter([
             'name'              => 'aws',
@@ -145,7 +145,7 @@ class Serverless
                     'images' => [
                         $image => [
                             'path' => Path::app(),
-                            'file' => file_exists($stage . '.Dockerfile') ? $stage . '.Dockerfile' : '.Dockerfile',
+                            'file' => \file_exists($stage . '.Dockerfile') ? $stage . '.Dockerfile' : '.Dockerfile',
                         ],
                     ],
                 ];

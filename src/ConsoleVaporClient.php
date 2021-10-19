@@ -44,17 +44,19 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      * @param string $name
      * @param int    $providerId
      * @param string $region
+     * @param mixed  $usesVanityDomain
      *
      * @return array
      */
-    public function createProject($name, $providerId, $region)
+    public function createProject($name, $providerId, $region, $usesVanityDomain)
     {
         return [
             'project' => [
-                'id'      => $name,
-                'name'    => $name,
-                'region'  => $region,
-                'project' => $name,
+                'id'                 => $name,
+                'name'               => $name,
+                'region'             => $region,
+                'project'            => $name,
+                'uses_vanity_domain' => $usesVanityDomain,
             ],
         ];
     }
