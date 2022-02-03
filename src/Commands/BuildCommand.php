@@ -23,8 +23,11 @@ use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
 use Laravel\VaporCli\BuildProcess\RemoveVendorPlatformCheck;
 use Laravel\VaporCli\BuildProcess\SetBuildEnvironment;
 use Laravel\VaporCli\BuildProcess\ValidateManifest;
+use Laravel\VaporCli\BuildProcess\ValidateOctaneDependencies;
 use Laravel\VaporCli\Commands\BuildCommand as VaporBuildCommand;
 use Laravel\VaporCli\Helpers;
+use Laravel\VaporCli\Manifest;
+use Laravel\VaporCli\Path;
 
 class BuildCommand extends VaporBuildCommand
 {
@@ -39,6 +42,12 @@ class BuildCommand extends VaporBuildCommand
 
         Helpers::line('Building project...');
 
+
+        if (Manifest::usesContainerImage($this->argument('environment')) &&
+            ! file_exists($file = Path::dockerfile($this->argument('environment')))) {
+            Helpers::abort("Please create a Dockerfile at [$file].");
+        }
+
         $startedAt = new DateTime();
 
         collect([
@@ -48,6 +57,7 @@ class BuildCommand extends VaporBuildCommand
             new HarmonizeConfigurationFiles(),
             //new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
             new ExecuteBuildCommands($this->argument('environment')),
+            new ValidateOctaneDependencies($this->argument('environment')),
             new ConfigureArtisan($this->argument('environment')),
             new ConfigureComposerAutoloader($this->argument('environment')),
             new RemoveIgnoredFiles(),

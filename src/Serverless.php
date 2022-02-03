@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Diviky\Serverless;
 
 use Diviky\Serverless\Concerns\EnvReader;
@@ -18,35 +20,35 @@ class Serverless
      *
      * @param string $stage
      */
-    public static function generate($stage)
+    public static function generate($stage): void
     {
         $manifest = Manifest::current();
 
-        $env           = $manifest['environments'][$stage];
-        $region        = $manifest['region'] ?? 'ap-south-1';
-        $name          = $manifest['name'];
-        $runtime       = $env['runtime'];
-        $image         = $manifest['name'];
-        $layers        = null;
-        $uuid          = \date('ymdhm');
-        $account_id    = $manifest['id'];
+        $env = $manifest['environments'][$stage];
+        $region = $manifest['region'] ?? 'ap-south-1';
+        $name = $manifest['name'];
+        $runtime = $env['runtime'];
+        $image = $manifest['name'];
+        $layers = null;
+        $uuid = \date('ymdhm');
+        $account_id = $manifest['id'];
 
-        $queue_name    = $stage . '_default';
-        $cache         = $name . '_' . $stage . '_cache';
+        $queue_name = $stage . '_default';
+        $cache = $name . '_' . $stage . '_cache';
 
         $docker = 'dockerize' == $runtime || 'docker' == $runtime;
 
         $env['layers'] = $env['layers'] ?? [];
 
         if (!$docker) {
-            $layers  = self::toLayers($runtime, $region);
-            $layers  = \array_filter(\array_merge($layers, $env['layers']));
+            $layers = self::toLayers($runtime, $region);
+            $layers = \array_filter(\array_merge($layers, $env['layers']));
         }
 
         //arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:11
 
         $yaml = [
-            'org'     => $manifest['org'] ?? $name,
+            'org' => $manifest['org'] ?? $name,
             'service' => $name,
         ];
 
@@ -61,59 +63,77 @@ class Serverless
         }
 
         $environment = \array_merge([
-            'VAPOR_SSM_PATH'                => $env['ssm'] ?? $name,
-            'VAPOR_SSM_VARIABLES'           => '[]',
-            'VAPOR_SERVERLESS_DB'           => 'false',
-            'VAPOR_MAINTENANCE_MODE'        => 'false',
+            'VAPOR_SSM_PATH' => $env['ssm'] ?? $name,
+            'VAPOR_SSM_VARIABLES' => '[]',
+            'VAPOR_SERVERLESS_DB' => 'false',
+            'VAPOR_MAINTENANCE_MODE' => 'false',
             'VAPOR_MAINTENANCE_MODE_SECRET' => 'secret',
-            'VAPOR_ENVIRONMENT'             => $stage,
-            'VAPOR_PROJECT'                 => $name,
-            'LOG_CHANNEL'                   => 'stderr',
-            'LOG_STDERR_FORMATTER'          => 'Laravel\Vapor\Logging\JsonFormatter',
-            'APP_CONFIG_CACHE'              => '/tmp/storage/bootstrap/cache/config.php',
-            'LD_LIBRARY_PATH'               => '/opt/lib:/opt/lib/bref:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib',
-            'PATH'                          => '/opt/bin:/usr/local/bin:/usr/bin/:/bin',
-            'XDG_CONFIG_HOME'               => '/tmp',
-            'APP_VANITY_URL'                => '',
+            'VAPOR_ENVIRONMENT' => $stage,
+            'VAPOR_PROJECT' => $name,
+            'LOG_CHANNEL' => 'stderr',
+            'LOG_STDERR_FORMATTER' => 'Laravel\Vapor\Logging\JsonFormatter',
+            'APP_CONFIG_CACHE' => '/tmp/storage/bootstrap/cache/config.php',
+            'LD_LIBRARY_PATH' => '/opt/lib:/opt/lib/bref:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib',
+            'PATH' => '/opt/bin:/usr/local/bin:/usr/bin/:/bin',
+            'XDG_CONFIG_HOME' => '/tmp',
+            'APP_VANITY_URL' => '',
         ], $secrets);
 
         $environment = \array_merge([
-            'QUEUE_CONNECTION'              => 'sqs',
-            'SESSION_DRIVER'                => 'cookie',
-            'CACHE_DRIVER'                  => 'dynamodb',
-            'DYNAMODB_CACHE_TABLE'          => $cache,
-            'SQS_QUEUE'                     => $queue_name,
+            'QUEUE_CONNECTION' => 'sqs',
+            'SESSION_DRIVER' => 'cookie',
+            'CACHE_DRIVER' => 'dynamodb',
+            'DYNAMODB_CACHE_TABLE' => $cache,
+            'SQS_QUEUE' => $queue_name,
         ], $environment);
 
-        $bucket        = null;
+        if (isset($env['octane'])) {
+            $environment = \array_merge([
+                'APP_RUNNING_IN_OCTANE' => 'true',
+            ], $environment);
+
+            if (isset($env['octane-database-session-persist'])) {
+                $environment = \array_merge([
+                    'OCTANE_DATABASE_SESSION_PERSIST' => 'true',
+                ], $environment);
+            }
+
+            if (isset($env['octane-database-session-ttl']) && is_numeric($env['octane-database-session-ttl'])) {
+                $environment = \array_merge([
+                    'OCTANE_DATABASE_SESSION_TTL' => $env['octane-database-session-ttl'],
+                ], $environment);
+            }
+        }
+
+        $bucket = null;
         $bucket_prefix = null;
         if (isset($env['assets']) && false !== $env['assets']) {
-            $bucket                         = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
-            $bucket_prefix                  = $stage . '/' . $uuid;
-            $environment['MIX_ASSET_URL']   = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
+            $bucket = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
+            $bucket_prefix = $stage . '/' . $uuid;
+            $environment['MIX_ASSET_URL'] = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
         }
 
         $environment = \array_merge($environment, self::envVarsToArray($env['environment'] ?? null));
 
         $yaml['provider'] = \array_filter([
-            'name'              => 'aws',
-            'region'            => $region,
-            'stage'             => $stage,
-            'runtime'           => 'provided',
-            'environment'       => $environment,
-            'apiGateway'        => [
+            'name' => 'aws',
+            'region' => $region,
+            'stage' => $stage,
+            'runtime' => 'provided',
+            'environment' => $environment,
+            'apiGateway' => [
                 'shouldStartNameWithService' => true,
             ],
-            'deploymentBucket'  => [
-                'name'                           => $env['deployment-bucket'] ?? 'com.${self:org}.${self:provider.region}.deploys',
+            'deploymentBucket' => [
+                'name' => $env['deployment-bucket'] ?? 'com.${self:org}.${self:provider.region}.deploys',
                 'maxPreviousDeploymentArtifacts' => 10,
-                'blockPublicAccess'              => true,
+                'blockPublicAccess' => true,
             ],
             'iam' => [
                 'role' => [
                     'statements' => [[
-                        'Effect'   => 'Allow',
-                        'Action'   => [
+                        'Effect' => 'Allow',
+                        'Action' => [
                             'route53:*',
                             'dynamodb:*',
                             's3:*',
@@ -133,8 +153,8 @@ class Serverless
                     ]],
                 ],
             ],
-            'vpc'               => \array_filter([
-                'subnetIds'        => $env['subnets'] ?? null,
+            'vpc' => \array_filter([
+                'subnetIds' => $env['subnets'] ?? null,
                 'securityGroupIds' => $env['security-groups'] ?? null,
             ]),
         ]);
@@ -158,58 +178,58 @@ class Serverless
 
         $yaml['functions'] = [];
         $yaml['resources'] = [];
-        $yaml['custom']    = [];
+        $yaml['custom'] = [];
 
         $web = [
-            'handler'                => 'vaporHandler.handle',
-            'timeout'                => $env['timeout'] ?? 28,
-            'memorySize'             => $env['memory'] ?? 1024,
-            'reservedConcurrency'    => $env['concurrency'] ?? null,
+            'handler' => 'vaporHandler.handle',
+            'timeout' => $env['timeout'] ?? 28,
+            'memorySize' => $env['memory'] ?? 1024,
+            'reservedConcurrency' => $env['concurrency'] ?? null,
             'provisionedConcurrency' => $env['capacity'] ?? null,
-            'layers'                 => $layers,
-            'events'                 => [
+            'layers' => $layers,
+            'events' => [
                 ['http' => 'ANY /'],
                 ['http' => 'ANY /{proxy+}'],
                 ['schedule' => [
                     'enabled' => true,
-                    'rate'    => 'rate(5 minutes)',
-                    'input'   => [
-                        'vaporWarmer'     => true,
+                    'rate' => 'rate(5 minutes)',
+                    'input' => [
+                        'vaporWarmer' => true,
                         'vaporWarmerPing' => true,
-                        'concurrency'     => $env['warm'] ?? 10,
+                        'concurrency' => $env['warm'] ?? 10,
                     ],
                 ]],
             ],
         ];
 
         $queue = [
-            'handler'             => 'vaporHandler.handle',
-            'environment'         => [
+            'handler' => 'vaporHandler.handle',
+            'environment' => [
                 'APP_RUNNING_IN_CONSOLE' => 'true',
             ],
-            'timeout'                => $env['queue-timeout'] ?? null,
-            'memorySize'             => $env['queue-memory'] ?? null,
-            'reservedConcurrency'    => $env['queue-concurrency'] ?? null,
-            'layers'                 => $layers,
-            'events'                 => [[
+            'timeout' => $env['queue-timeout'] ?? null,
+            'memorySize' => $env['queue-memory'] ?? null,
+            'reservedConcurrency' => $env['queue-concurrency'] ?? null,
+            'layers' => $layers,
+            'events' => [[
                 'sqs' => [
-                    'arn'       => '!GetAtt Queues.Arn',
+                    'arn' => '!GetAtt Queues.Arn',
                     'batchSize' => $env['queue-size'] ?? 1,
                 ],
             ]],
         ];
 
         $schedule = [
-            'handler'     => 'vaporHandler.handle',
+            'handler' => 'vaporHandler.handle',
             'environment' => [
                 'APP_RUNNING_IN_CONSOLE' => 'true',
             ],
-            'timeout'    => $env['cli-timeout'] ?? null,
+            'timeout' => $env['cli-timeout'] ?? null,
             'memorySize' => $env['cli-memory'] ?? 1024,
-            'layers'     => $layers,
-            'events'     => [[
+            'layers' => $layers,
+            'events' => [[
                 'schedule' => [
-                    'rate'    => 'rate(1 minute)',
+                    'rate' => 'rate(1 minute)',
                     'enabled' => true,
                 ],
             ]],
@@ -223,22 +243,22 @@ class Serverless
 
         if (false !== $env['queues']) {
             $resources['Queues'] = [
-                'Type'       => 'AWS::SQS::Queue',
+                'Type' => 'AWS::SQS::Queue',
                 'Properties' => [
-                    'QueueName'     => $queue_name,
+                    'QueueName' => $queue_name,
                     'RedrivePolicy' => [
-                        'maxReceiveCount'     => 3,
+                        'maxReceiveCount' => 3,
                         'deadLetterTargetArn' => '!GetAtt FailedQueues.Arn',
                     ],
                 ],
             ];
 
             $resources['FailedQueues'] = [
-                'Type'       => 'AWS::SQS::Queue',
+                'Type' => 'AWS::SQS::Queue',
                 'Properties' => [
-                    'Type'       => 'AWS::SQS::Queue',
+                    'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
-                        'QueueName'              => $queue_name . '_failed',
+                        'QueueName' => $queue_name . '_failed',
                         'MessageRetentionPeriod' => (7 * 24 * 60),
                     ],
                 ],
@@ -247,16 +267,16 @@ class Serverless
 
         if (isset($environment['CACHE_DRIVER']) && 'dynamodb' == $environment['CACHE_DRIVER']) {
             $resources['cacheTable'] = [
-                'Type'       => 'AWS::DynamoDB::Table',
+                'Type' => 'AWS::DynamoDB::Table',
                 'Properties' => [
-                    'TableName'             => $cache,
-                    'AttributeDefinitions'  => [[
+                    'TableName' => $cache,
+                    'AttributeDefinitions' => [[
                         'AttributeName' => 'key',
                         'AttributeType' => 'S',
                     ]],
-                    'KeySchema'             => [[
+                    'KeySchema' => [[
                         'AttributeName' => 'key',
-                        'KeyType'       => 'HASH',
+                        'KeyType' => 'HASH',
                     ]],
                     'BillingMode' => 'PAY_PER_REQUEST',
                 ],
@@ -265,15 +285,15 @@ class Serverless
             if (isset($env['autoscale']) && false !== $env['autoscale']) {
                 $yaml['custom']['capacities'] = [[
                     'table' => 'cacheTable',
-                    'read'  => [
+                    'read' => [
                         'minimum' => 1,
                         'maximum' => 1000,
-                        'usage'   => 0.75,
+                        'usage' => 0.75,
                     ],
                     'write' => [
                         'minimum' => 40,
                         'maximum' => 200,
-                        'usage'   => 0.5,
+                        'usage' => 0.5,
                     ],
                 ]];
 
@@ -283,17 +303,17 @@ class Serverless
 
         if (isset($bucket)) {
             $yaml['custom']['s3Sync'] = [[
-                'bucketName'   => $bucket,
+                'bucketName' => $bucket,
                 'bucketPrefix' => $bucket_prefix,
-                'localDir'     => 'assets',
-                'acl'          => 'public-read',
+                'localDir' => 'assets',
+                'acl' => 'public-read',
             ]];
 
             if (isset($env['asset-bucket']) && false !== $env['asset-bucket']) {
                 $resources['AssetsBucket'] = [
-                    'Type'       => 'AWS::S3::Bucket',
+                    'Type' => 'AWS::S3::Bucket',
                     'Properties' => [
-                        'BucketName'    => $bucket,
+                        'BucketName' => $bucket,
                         'AccessControl' => 'PublicRead',
                     ],
                 ];
@@ -312,12 +332,12 @@ class Serverless
             $domain = \str_replace('*', '${opt:RANDOM_STRING}', $domain);
 
             $yaml['custom']['customDomain'] = \array_filter([
-                'domainName'           => $domain,
-                'stage'                => '${self:provider.stage}',
-                'createRoute53Record'  => 'true',
-                'autoDomain'           => 'true',
-                'endpointType'         => $env['endpoint'] ?? 'regional',
-                'certificateName'      => $env['certificate'] ?? null,
+                'domainName' => $domain,
+                'stage' => '${self:provider.stage}',
+                'createRoute53Record' => 'true',
+                'autoDomain' => 'true',
+                'endpointType' => $env['endpoint'] ?? 'regional',
+                'certificateName' => $env['certificate'] ?? null,
             ]);
 
             \array_push($yaml['plugins'], 'serverless-domain-manager');
@@ -336,7 +356,7 @@ class Serverless
 
                 $fs = [
                     'localMountPath' => $local,
-                    'arn'            => $access_point,
+                    'arn' => $access_point,
                 ];
             }
 
@@ -349,10 +369,10 @@ class Serverless
                     $web['image'] = $env['image'];
                 } else {
                     $web['image'] = [
-                        'name'             => $image,
+                        'name' => $image,
                         'workingDirectory' => $env['working-dir'] ?? '/var/task',
-                        'command'          => $env['cmd'] ?? null,
-                        'entryPoint'       => $env['entry-point'] ?? null,
+                        'command' => $env['cmd'] ?? null,
+                        'entryPoint' => $env['entry-point'] ?? null,
                     ];
                 }
 
@@ -372,10 +392,10 @@ class Serverless
                     $queue['image'] = $env['image'];
                 } else {
                     $queue['image'] = [
-                        'name'             => $image,
+                        'name' => $image,
                         'workingDirectory' => $env['working-dir'] ?? '/var/task',
-                        'command'          => $env['cmd'] ?? null,
-                        'entryPoint'       => $env['entry-point'] ?? null,
+                        'command' => $env['cmd'] ?? null,
+                        'entryPoint' => $env['entry-point'] ?? null,
                     ];
                 }
 
@@ -395,10 +415,10 @@ class Serverless
                     $schedule['image'] = $env['image'];
                 } else {
                     $schedule['image'] = [
-                        'name'             => $image,
+                        'name' => $image,
                         'workingDirectory' => $env['working-dir'] ?? '/var/task',
-                        'command'          => $env['cmd'] ?? null,
-                        'entryPoint'       => $env['entry-point'] ?? null,
+                        'command' => $env['cmd'] ?? null,
+                        'entryPoint' => $env['entry-point'] ?? null,
                     ];
                 }
 
@@ -420,7 +440,7 @@ class Serverless
         return Path::build() . '/serverless.yml';
     }
 
-    public static function deploy($extra = null)
+    public static function deploy($extra = null): void
     {
         Helpers::step('<comment>Executing Serverless Commands</comment>');
 
@@ -428,7 +448,7 @@ class Serverless
         $process = Process::fromShellCommandline($command, Path::build());
         $process->setTimeout(10 * 60 * 60);
 
-        $process->mustRun(function ($type, $line) {
+        $process->mustRun(function ($type, $line): void {
             $line = \str_replace('Serverless: ', '', $line);
             Helpers::write($line);
         });
@@ -439,7 +459,7 @@ class Serverless
      *
      * @param null|string $path
      */
-    protected static function write(array $manifest, $path = null)
+    protected static function write(array $manifest, $path = null): void
     {
         $yaml = Yaml::dump($manifest, 20, 2);
         $yaml = \preg_replace("/'(![^']+)'/", '$1', $yaml);
@@ -453,10 +473,10 @@ class Serverless
             return [];
         }
 
-        $layers   = static::layers();
-        $runtime  = \str_replace('.', '', $runtime);
-        $layer    = isset($layers[$runtime]) ? $layers[$runtime] : [];
-        $layer    = isset($layer[$region]) ? $layer[$region] : null;
+        $layers = static::layers();
+        $runtime = \str_replace('.', '', $runtime);
+        $layer = isset($layers[$runtime]) ? $layers[$runtime] : [];
+        $layer = isset($layer[$region]) ? $layer[$region] : null;
 
         return !\is_array($layer) ? [$layer] : $layer;
     }
@@ -480,7 +500,7 @@ class Serverless
         foreach ($environments as $environment) {
             if (false !== \strpos($environment, '=')) {
                 list($key, $value) = \explode('=', $environment, 2);
-                $variables[$key]   = $value;
+                $variables[$key] = $value;
             }
         }
 
