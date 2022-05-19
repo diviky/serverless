@@ -45,7 +45,7 @@ class Serverless
             $layers = \array_filter(\array_merge($layers, $env['layers']));
         }
 
-        //arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:11
+        // arn:aws:lambda:ap-south-1:959512994844:layer:vapor-php-74:11
 
         $yaml = [
             'org' => $manifest['org'] ?? $name,
@@ -54,12 +54,14 @@ class Serverless
 
         $secrets = [];
 
-        if ($docker) {
-            $secrets = static::getProjectEnv(Path::app(), $stage, '.env.docker');
-        }
+        if (!empty($env['copy-env'])) {
+            if ($docker) {
+                $secrets = static::getProjectEnv(Path::app(), $stage, '.env.docker');
+            }
 
-        if (empty($secrets)) {
-            $secrets = static::getProjectEnv(Path::app(), $stage, '.env');
+            if (empty($secrets)) {
+                $secrets = static::getProjectEnv(Path::app(), $stage, '.env');
+            }
         }
 
         $environment = \array_merge([
@@ -360,7 +362,7 @@ class Serverless
                 ];
             }
 
-            //\array_push($yaml['plugins'], 'serverless-pseudo-parameters');
+            // \array_push($yaml['plugins'], 'serverless-pseudo-parameters');
         }
 
         if (!isset($env['web']) || false !== $env['web']) {
