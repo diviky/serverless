@@ -65,7 +65,7 @@ class Serverless
         }
 
         $environment = \array_merge([
-            'VAPOR_SSM_PATH' => $env['ssm'] ?? $name,
+            'VAPOR_SSM_PATH' => $env['ssm'] ?? '/' . $name . '/' . $stage,
             'VAPOR_SSM_VARIABLES' => '[]',
             'VAPOR_SERVERLESS_DB' => 'false',
             'VAPOR_MAINTENANCE_MODE' => 'false',
@@ -80,14 +80,6 @@ class Serverless
             'XDG_CONFIG_HOME' => '/tmp',
             'APP_VANITY_URL' => '',
         ], $secrets);
-
-        $environment = \array_merge([
-            'QUEUE_CONNECTION' => 'sqs',
-            'SESSION_DRIVER' => 'cookie',
-            'CACHE_DRIVER' => 'dynamodb',
-            'DYNAMODB_CACHE_TABLE' => $cache,
-            'SQS_QUEUE' => $queue_name,
-        ], $environment);
 
         if (isset($env['octane'])) {
             $environment = \array_merge([
