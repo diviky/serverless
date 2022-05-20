@@ -49,7 +49,7 @@ class Serverless
 
         $yaml = [
             'org' => $manifest['org'] ?? $name,
-            'service' => $name,
+            'service' => $manifest['service'] ?? $name,
         ];
 
         $secrets = [];
@@ -65,7 +65,7 @@ class Serverless
         }
 
         $environment = \array_merge([
-            'VAPOR_SSM_PATH' => $env['ssm'] ?? '/' . $name . '/' . $stage,
+            'VAPOR_SSM_PATH' => $env['ssm'] ?? '/' . $yaml['org'] . '/' . $stage . '/' . $name,
             'VAPOR_SSM_VARIABLES' => '[]',
             'VAPOR_SERVERLESS_DB' => 'false',
             'VAPOR_MAINTENANCE_MODE' => 'false',
@@ -129,7 +129,6 @@ class Serverless
                         'Effect' => 'Allow',
                         'Action' => [
                             'route53:*',
-                            'dynamodb:*',
                             's3:*',
                             'ses:*',
                             'sqs:*',
