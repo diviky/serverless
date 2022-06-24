@@ -35,6 +35,12 @@ class Serverless
 
         $queue_name = $stage . '_default';
         $cache = $name . '_' . $stage . '_cache';
+        $queues = $env['queues'];
+
+        if (false !== $queues) {
+            $queues = true === $queues ? [$queue_name] : $queues;
+            $queues = !is_array($queues) ? [$queues] : $queues;
+        }
 
         $docker = 'dockerize' == $runtime || 'docker' == $runtime;
 
@@ -204,12 +210,7 @@ class Serverless
             'memorySize' => $env['queue-memory'] ?? null,
             'reservedConcurrency' => $env['queue-concurrency'] ?? null,
             'layers' => $layers,
-            'events' => [[
-                'sqs' => [
-                    'arn' => '!GetAtt Queues.Arn',
-                    'batchSize' => $env['queue-size'] ?? 1,
-                ],
-            ]],
+            'events' => [],
         ];
 
         $schedule = [
@@ -234,28 +235,27 @@ class Serverless
 
         $resources = [];
 
-        if (false !== $env['queues']) {
-            $resources['Queues'] = [
-                'Type' => 'AWS::SQS::Queue',
-                'Properties' => [
-                    'QueueName' => $queue_name,
-                    'RedrivePolicy' => [
-                        'maxReceiveCount' => 3,
-                        'deadLetterTargetArn' => '!GetAtt FailedQueues.Arn',
+        if (false !== $queues) {
+            foreach ($queues as $queue_name) {
+                $resources[ucfirst($queue_name).'Queue'] = [
+                    'Type' => 'AWS::SQS::Queue',
+                    'Properties' => [
+                        'QueueName' => $queue_name,
+                        'RedrivePolicy' => [
+                            'maxReceiveCount' => 3,
+                            'deadLetterTargetArn' => '!GetAtt '.ucfirst($queue_name).'FailedQueue.Arn',
+                        ],
                     ],
-                ],
-            ];
+                ];
 
-            $resources['FailedQueues'] = [
-                'Type' => 'AWS::SQS::Queue',
-                'Properties' => [
+                $resources[ucfirst($queue_name).'FailedQueue'] = [
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name . '_failed',
                         'MessageRetentionPeriod' => (7 * 24 * 60),
                     ],
-                ],
-            ];
+                ];
+            }
         }
 
         if (isset($environment['CACHE_DRIVER']) && 'dynamodb' == $environment['CACHE_DRIVER']) {
@@ -379,7 +379,7 @@ class Serverless
             $yaml['functions']['web'] = \array_filter($web);
         }
 
-        if (isset($env['queues']) && false !== $env['queues']) {
+        if (isset($env['queues']) && false !== $queues) {
             if ($docker) {
                 if (isset($env['image'])) {
                     $queue['image'] = $env['image'];
@@ -397,6 +397,13 @@ class Serverless
 
             if (isset($fs) && \is_array($fs)) {
                 $queue['fileSystemConfig'] = $fs;
+            }
+
+            foreach ($queues as $queue_name) {
+                $queue['events'][]['sqs'] = [
+                    'arn' => '!GetAtt '.ucfirst($queue_name).'Queue.Arn',
+                    'batchSize' => $env['queue-size'] ?? 1,
+                ];
             }
 
             $yaml['functions']['queue'] = \array_filter($queue);
