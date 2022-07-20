@@ -201,6 +201,10 @@ class Serverless
             ],
         ];
 
+        if (isset($env['web'], $env['web']['events']) && is_array($env['web']['events'])) {
+            $web['events'] = array_merge($web['events'], $env['web']['events']);
+        }
+
         $queue = [
             'handler' => 'vaporHandler.handle',
             'environment' => [
@@ -212,6 +216,10 @@ class Serverless
             'layers' => $layers,
             'events' => [],
         ];
+
+        if (isset($env['queue'], $env['queue']['events']) && is_array($env['queue']['events'])) {
+            $queue['events'] = array_merge($queue['events'], $env['queue']['events']);
+        }
 
         $schedule = [
             'handler' => 'vaporHandler.handle',
@@ -229,6 +237,10 @@ class Serverless
             ]],
         ];
 
+        if (isset($env['schedule'], $env['schedule']['events']) && is_array($env['schedule']['events'])) {
+            $schedule['events'] = array_merge($schedule['events'], $env['schedule']['events']);
+        }
+
         $yaml['plugins'] = [
             'serverless-deployment-bucket',
         ];
@@ -237,18 +249,18 @@ class Serverless
 
         if (false !== $queues) {
             foreach ($queues as $queue_name) {
-                $resources[ucfirst($queue_name).'Queue'] = [
+                $resources[ucfirst($queue_name) . 'Queue'] = [
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name,
                         'RedrivePolicy' => [
                             'maxReceiveCount' => 3,
-                            'deadLetterTargetArn' => '!GetAtt '.ucfirst($queue_name).'FailedQueue.Arn',
+                            'deadLetterTargetArn' => '!GetAtt ' . ucfirst($queue_name) . 'FailedQueue.Arn',
                         ],
                     ],
                 ];
 
-                $resources[ucfirst($queue_name).'FailedQueue'] = [
+                $resources[ucfirst($queue_name) . 'FailedQueue'] = [
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name . '_failed',
@@ -401,7 +413,7 @@ class Serverless
 
             foreach ($queues as $queue_name) {
                 $queue['events'][]['sqs'] = [
-                    'arn' => '!GetAtt '.ucfirst($queue_name).'Queue.Arn',
+                    'arn' => '!GetAtt ' . ucfirst($queue_name) . 'Queue.Arn',
                     'batchSize' => $env['queue-size'] ?? 1,
                 ];
             }
