@@ -1,4 +1,4 @@
-# Laravel Vapor CLI
+# Laravel Serverless Deployment
 
 ## npm packages
 
