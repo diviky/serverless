@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Diviky\Serverless;
 
 use Diviky\Serverless\Concerns\EnvReader;
+use Illuminate\Support\Str;
 use Laravel\VaporCli\Helpers;
 use Laravel\VaporCli\Manifest;
 use Laravel\VaporCli\Path;
@@ -208,7 +209,7 @@ class Serverless
 
         if (isset($env['web'], $env['web']['targets']) && is_array($env['web']['targets'])) {
             foreach ($env['web']['targets'] as $value) {
-                $resources[$value['name'] . '-tg'] = self::createTargetGroup('web', $value);
+                $resources[Str::studly($value['name'] . '-tg')] = self::createTargetGroup('web', $value);
             }
         }
 
