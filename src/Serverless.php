@@ -59,6 +59,7 @@ class Serverless
         ];
 
         $secrets = [];
+        $resources = [];
 
         if (!empty($env['copy-env'])) {
             if ($docker) {
@@ -205,6 +206,12 @@ class Serverless
             $web['events'] = array_merge($web['events'], $env['web']['events']);
         }
 
+        if (isset($env['web'], $env['web']['targets']) && is_array($env['web']['targets'])) {
+            foreach ($env['web']['targets'] as $value) {
+                $resources[$value['name'] . '-tg'] = self::createTargetGroup('web', $value);
+            }
+        }
+
         $queue = [
             'handler' => 'vaporHandler.handle',
             'environment' => [
@@ -244,8 +251,6 @@ class Serverless
         $yaml['plugins'] = [
             'serverless-deployment-bucket',
         ];
-
-        $resources = [];
 
         if (false !== $queues) {
             foreach ($queues as $queue_name) {
@@ -348,8 +353,6 @@ class Serverless
             \array_push($yaml['plugins'], 'serverless-domain-manager');
         }
 
-        $yaml['resources'] = ['Resources' => $resources];
-
         $fs = null;
         if (isset($env['volumes']) && \count($env['volumes']) > 0) {
             foreach ($env['volumes'] as $volume) {
@@ -444,6 +447,8 @@ class Serverless
             $yaml['functions']['schedule'] = \array_filter($schedule);
         }
 
+        $yaml['resources'] = ['Resources' => $resources];
+
         static::write(\array_filter($yaml));
     }
 
@@ -517,5 +522,38 @@ class Serverless
         }
 
         return $variables;
+    }
+
+    protected static function createTargetGroup($name, $data = [])
+    {
+        $health = $data['health'] ?? [];
+
+        return [
+            'Type' => 'AWS::ElasticLoadBalancingV2::TargetGroup',
+            'Properties' => [
+                'TargetType' => 'lambda',
+                'Targets' => [['Id' => ['Fn::GetAtt' => [ucfirst($name) . 'LambdaFunction', 'Arn']]]],
+                'Name' => $data['name'],
+                'Tags' => [
+                    [
+                        'Key' => 'Name',
+                        'Value' => $data['name'],
+                    ],
+                ],
+                'TargetGroupAttributes' => [
+                    [
+                        'Key' => 'lambda.multi_value_headers.enabled',
+                        'Value' => true,
+                    ],
+                ],
+                'HealthCheckEnabled' => isset($health['path']) ? true : false,
+                'HealthCheckPath' => $health['path'] ?? '',
+                'HealthCheckIntervalSeconds' => $health['interval'] ?? 35,
+                'HealthCheckTimeoutSeconds' => $health['timeout'] ?? 30,
+                'HealthyThresholdCount' => $health['count'] ?? 5,
+                'UnhealthyThresholdCount' => $health['count'] ?? 5,
+                'Matcher' => ['HttpCode' => '200'],
+            ],
+        ];
     }
 }
