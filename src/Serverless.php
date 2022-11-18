@@ -122,6 +122,7 @@ class Serverless
             'region' => $region,
             'stage' => $stage,
             'runtime' => 'provided',
+            'architecture' => $manifest['architecture'] ?? null,
             'environment' => $environment,
             'apiGateway' => [
                 'shouldStartNameWithService' => true,
@@ -161,7 +162,7 @@ class Serverless
         ]);
 
         if ($docker) {
-            if (!isset($env['image'])) {
+            if (empty($env['image'])) {
                 $yaml['provider']['ecr'] = [
                     'images' => [
                         $image => [
@@ -357,16 +358,18 @@ class Serverless
         $fs = null;
         if (isset($env['volumes']) && \count($env['volumes']) > 0) {
             foreach ($env['volumes'] as $volume) {
-                list($local, $access_point) = \explode(':', $volume);
+                list($local, $access_point) = \explode(':', $volume, 2);
 
-                if ('arn:' != \substr($access_point, 0, 4)) {
+                if (!empty($access_point) && 'arn:' != \substr($access_point, 0, 4)) {
                     $access_point = 'arn:aws:elasticfilesystem:${self:provider.region}:' . $account_id . ':access-point/' . $access_point;
                 }
 
-                $fs = [
-                    'localMountPath' => $local,
-                    'arn' => $access_point,
-                ];
+                if (!empty($local) && !empty($access_point)) {
+                    $fs = [
+                        'localMountPath' => $local,
+                        'arn' => $access_point,
+                    ];
+                }
             }
 
             // \array_push($yaml['plugins'], 'serverless-pseudo-parameters');
@@ -374,7 +377,7 @@ class Serverless
 
         if (!isset($env['web']) || false !== $env['web']) {
             if ($docker) {
-                if (isset($env['image'])) {
+                if (!empty($env['image'])) {
                     $web['image'] = $env['image'];
                 } else {
                     $web['image'] = [
@@ -388,8 +391,16 @@ class Serverless
                 unset($web['handler'], $web['layers']);
             }
 
-            if (isset($fs) && \is_array($fs)) {
+            if (!empty($fs) && \is_array($fs)) {
                 $web['fileSystemConfig'] = $fs;
+            }
+
+            if (!empty($env['size']) && is_numeric($env['size'])) {
+                $web['ephemeralStorageSize'] = $env['size'];
+            }
+
+            if (!empty($env['kms'])) {
+                $web['awsKmsKeyArn'] = ('arn:' != \substr($env['kms'], 0, 4)) ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
             }
 
             $yaml['functions']['web'] = \array_filter($web);
@@ -397,7 +408,7 @@ class Serverless
 
         if (isset($env['queues']) && false !== $queues) {
             if ($docker) {
-                if (isset($env['image'])) {
+                if (!empty($env['image'])) {
                     $queue['image'] = $env['image'];
                 } else {
                     $queue['image'] = [
@@ -411,8 +422,16 @@ class Serverless
                 unset($queue['handler'], $queue['layers']);
             }
 
-            if (isset($fs) && \is_array($fs)) {
+            if (!empty($fs) && \is_array($fs)) {
                 $queue['fileSystemConfig'] = $fs;
+            }
+
+            if (!empty($env['size']) && is_numeric($env['size'])) {
+                $queue['ephemeralStorageSize'] = $env['size'];
+            }
+
+            if (!empty($env['kms'])) {
+                $queue['awsKmsKeyArn'] = ('arn:' != \substr($env['kms'], 0, 4)) ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
             }
 
             foreach ($queues as $queue_name) {
@@ -427,7 +446,7 @@ class Serverless
 
         if (isset($env['scheduler']) && false !== $env['scheduler']) {
             if ($docker) {
-                if (isset($env['image'])) {
+                if (!empty($env['image'])) {
                     $schedule['image'] = $env['image'];
                 } else {
                     $schedule['image'] = [
@@ -441,8 +460,16 @@ class Serverless
                 unset($schedule['handler'], $schedule['layers']);
             }
 
-            if (isset($fs) && \is_array($fs)) {
+            if (!empty($fs) && \is_array($fs)) {
                 $schedule['fileSystemConfig'] = $fs;
+            }
+
+            if (!empty($env['size']) && is_numeric($env['size'])) {
+                $schedule['ephemeralStorageSize'] = $env['size'];
+            }
+
+            if (!empty($env['kms'])) {
+                $schedule['awsKmsKeyArn'] = ('arn:' != \substr($env['kms'], 0, 4)) ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
             }
 
             $yaml['functions']['schedule'] = \array_filter($schedule);

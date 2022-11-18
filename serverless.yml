@@ -2,6 +2,7 @@ id: mobtexting
 org: mobtexting
 name: whatsapp
 region: ap-south-1
+architecture: null
 ignore:
   - database
   - docker
@@ -24,6 +25,7 @@ environments:
   production:
     memory: 1024
     cli-memory: 512
+    kms: arn:aws:kms:us-east-1:XXXXXX:key/some-hash
     #runtime: php-7.4:2la
     runtime: docker
     #image: php7-fpm # custom docker image
@@ -36,6 +38,7 @@ environments:
     asset-bucket: true # create aws bucket
     warm: 10
     timeout: 30
+    size: 1024
     scheduler: false
     queues: false
     cloudfront: false
