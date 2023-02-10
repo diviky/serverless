@@ -17,7 +17,7 @@
         "deployer"
     ],
     "require": {
-        "laravel/vapor-cli": "1.28"
+        "laravel/vapor-cli": "^1.54"
     },
     "require-dev": {
         "phpunit/phpunit": "^8.0|^9.0"

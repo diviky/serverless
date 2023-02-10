@@ -36,7 +36,7 @@ class Serverless
 
         $queue_name = $stage . '_default';
         $cache = $name . '_' . $stage . '_cache';
-        $queues = $env['queues'];
+        $queues = $env['queues'] ?? false;
 
         if (false !== $queues) {
             $queues = true === $queues ? [$queue_name] : $queues;
@@ -371,8 +371,6 @@ class Serverless
                     ];
                 }
             }
-
-            // \array_push($yaml['plugins'], 'serverless-pseudo-parameters');
         }
 
         if (!isset($env['web']) || false !== $env['web']) {
