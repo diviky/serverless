@@ -184,7 +184,7 @@ class Serverless
 
         $web = [
             'handler' => 'vaporHandler.handle',
-            'timeout' => $env['timeout'] ?? 28,
+            'timeout' => $env['timeout'] ?? 60,
             'memorySize' => $env['memory'] ?? 1024,
             'reservedConcurrency' => $env['concurrency'] ?? null,
             'provisionedConcurrency' => $env['capacity'] ?? null,
@@ -219,7 +219,7 @@ class Serverless
             'environment' => [
                 'APP_RUNNING_IN_CONSOLE' => 'true',
             ],
-            'timeout' => $env['queue-timeout'] ?? null,
+            'timeout' => $env['queue-timeout'] ?? ($env['timeout'] ?? 60),
             'memorySize' => $env['queue-memory'] ?? null,
             'reservedConcurrency' => $env['queue-concurrency'] ?? null,
             'layers' => $layers,
@@ -235,7 +235,7 @@ class Serverless
             'environment' => [
                 'APP_RUNNING_IN_CONSOLE' => 'true',
             ],
-            'timeout' => $env['cli-timeout'] ?? null,
+            'timeout' => $env['cli-timeout'] ?? ($env['timeout'] ?? 60),
             'memorySize' => $env['cli-memory'] ?? 1024,
             'layers' => $layers,
             'events' => [[
