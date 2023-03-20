@@ -260,6 +260,7 @@ class Serverless
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name,
+                        'VisibilityTimeout' => $env['queue-timeout'] ?? ($env['timeout'] ?? 60),
                         'RedrivePolicy' => [
                             'maxReceiveCount' => 3,
                             'deadLetterTargetArn' => '!GetAtt ' . ucfirst($queue_name) . 'FailedQueue.Arn',
@@ -271,6 +272,7 @@ class Serverless
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name . '_failed',
+                        'VisibilityTimeout' => $env['queue-timeout'] ?? ($env['timeout'] ?? 60),
                         'MessageRetentionPeriod' => (7 * 24 * 60),
                     ],
                 ];
