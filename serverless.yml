@@ -6,7 +6,6 @@ ignore:
   - database
   - docker
   - scripts
-  - resources/themes/tabler/assets
   - resources/assets
   - storage/geoip
   - git
