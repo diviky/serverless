@@ -1,0 +1,62 @@
+image:
+  name: 097427577457.dkr.ecr.ap-south-1.amazonaws.com/pipeline81:latest
+  aws:
+    access-key: $AWS_ACCESS_KEY_ID
+    secret-key: $AWS_SECRET_ACCESS_KEY
+
+options:
+  docker: true
+
+release: &release
+  name: Tag the release
+  script:
+    - '[ -f "account.txt" ] && export ACCOUNT_NAME=$(cat account.txt)'
+    - export AWS_ACCOUNT=${ACCOUNT_NAME:-DEV}
+    - echo "Releasing to ${AWS_ACCOUNT} account"
+    - bash ./deployer
+    - bash ./scripts/git
+  artifacts:
+    - RELEASE
+
+deployment: &deployment
+  name: "Deploy to serverless"
+  script:
+    - git fetch --all --tags -f
+    - '[ -f "account.txt" ] && export ACCOUNT_NAME=$(cat account.txt)'
+    - '[ -f "RELEASE" ] && export TAG_NAME=$(cat RELEASE)'
+    - '[ ! -z "${TAG_NAME}" ] && git checkout tags/${TAG_NAME} && export BITBUCKET_TAG=${TAG_NAME}'
+    - export AWS_ACCOUNT=${ACCOUNT_NAME:-DEV}
+    - echo "Releasing to ${AWS_ACCOUNT} account"
+    - bash ./deployer
+    - bash ./scripts/deploy
+
+account: &account
+  name: "Setup deployment account"
+  script:
+    - touch account.txt && echo ${ACCOUNT} > account.txt
+  artifacts:
+    - account.txt
+
+pipelines:
+  custom:
+    release:
+      - variables:
+          - name: TAG_PREFIX
+            default: v
+      - step: *release
+    deployment:
+      - variables:
+          - name: TAG_NAME
+            default: v-latest
+          - name: ACCOUNT_NAME
+            default: DEV
+      - step: *deployment
+
+  tags:
+    prod-*:
+      - step: *account
+      - step: *release
+      - step: *deployment
+
+    dev-*:
+      - step: *deployment
