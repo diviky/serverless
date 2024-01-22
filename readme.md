@@ -9,5 +9,5 @@ npm install -g serverless-dynamodb-autoscaling
 npm install -g serverless-s3-sync
 npm install -g serverless-plugin-scripts
 npm install -g serverless-domain-manager
-
+npm install -g serverless-lift
 ```
