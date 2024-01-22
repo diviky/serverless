@@ -15,7 +15,7 @@ trait ExecuteTrait
      *
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->startedAt = new DateTime();
 
@@ -29,6 +29,6 @@ trait ExecuteTrait
 
         $this->configureOutputStyles($output);
 
-        return Helpers::app()->call([$this, 'handle']) ?: 0;
+        return (int) (Helpers::app()->call([$this, 'handle']) ?: 0);
     }
 }
