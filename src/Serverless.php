@@ -320,7 +320,7 @@ class Serverless
                 'bucketName' => $bucket,
                 'bucketPrefix' => $bucket_prefix,
                 'localDir' => 'assets',
-                'acl' => 'public-read',
+                //'acl' => 'public-read',
             ]];
 
             if (isset($env['asset-bucket']) && false !== $env['asset-bucket']) {
