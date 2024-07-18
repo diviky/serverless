@@ -328,7 +328,7 @@ class Serverless
                     'Type' => 'AWS::S3::Bucket',
                     'Properties' => [
                         'BucketName' => $bucket,
-                        'AccessControl' => 'PublicRead',
+                        //'AccessControl' => 'PublicRead',
                     ],
                 ];
             }
