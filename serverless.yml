@@ -1,6 +1,6 @@
-id: mobtexting
-org: mobtexting
-name: whatsapp
+id: diviky
+org: diviky
+name: app
 region: ap-south-1
 architecture: null
 ignore:
@@ -31,15 +31,17 @@ environments:
     #cmd: null #Specifies parameters array that you want to pass in with ENTRYPOINT.
     #entry-point: null #Specifies the entry point array to their application, which is typically the location of the runtime executable.
     #working-dir: /var/task
+    copy-env: true # copy the environments from the .env file
     environment:
       #- APP_CONFIG_CACHE=/mnt/local/storage/bootstrap/cache/config.php
-    assets: com.whatsapp.ap-south-1.assets
+    assets: com-diviky.ap-south-1.assets
     asset-bucket: true # create aws bucket
     warm: 10
     timeout: 30
     size: 1024
     scheduler: false
     queues: false
+    octane: true
     cloudfront: false
     volumes:
       - /mnt/storage:fsap-0a31095162dd0ca44
@@ -55,7 +57,7 @@ environments:
     memory: 512
     cli-memory: 512
     #runtime: php-7.4:2la
-    runtime: docker
+    runtime: docker-arm
     assets: true
     timeout: 30
     scheduler: false

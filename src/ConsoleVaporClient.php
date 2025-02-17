@@ -16,7 +16,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     public function providers()
     {
         return [[
-            'id'   => 'aws',
+            'id' => 'aws',
             'name' => 'aws',
         ]];
     }
@@ -24,15 +24,14 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Get the project with the given ID.
      *
-     * @param string $projectId
-     *
+     * @param  string  $projectId
      * @return array
      */
     public function project($projectId)
     {
         return [
             'cloudfront_status' => '',
-            'asset_domains'     => [
+            'asset_domains' => [
                 's3' => 'https://s3.com/',
             ],
         ];
@@ -41,21 +40,20 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Create a new project.
      *
-     * @param string $name
-     * @param int    $providerId
-     * @param string $region
-     * @param mixed  $usesVanityDomain
-     *
+     * @param  string  $name
+     * @param  int  $providerId
+     * @param  string  $region
+     * @param  mixed  $usesVanityDomain
      * @return array
      */
     public function createProject($name, $providerId, $region, $usesVanityDomain)
     {
         return [
             'project' => [
-                'id'                 => $name,
-                'name'               => $name,
-                'region'             => $region,
-                'project'            => $name,
+                'id' => $name,
+                'name' => $name,
+                'region' => $region,
+                'project' => $name,
                 'uses_vanity_domain' => $usesVanityDomain,
             ],
         ];
@@ -64,16 +62,15 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Get a pre-signed storage URL for the given project.
      *
-     * @param int    $projectId
-     * @param string $uuid
-     * @param string $environment
-     * @param string $file
-     * @param string $commit
-     * @param string $commitMessage
-     * @param string $vendorHash
-     * @param string $cliVersion
-     * @param string $coreVersion
-     *
+     * @param  int  $projectId
+     * @param  string  $uuid
+     * @param  string  $environment
+     * @param  string  $file
+     * @param  string  $commit
+     * @param  string  $commitMessage
+     * @param  string  $vendorHash
+     * @param  string  $cliVersion
+     * @param  string  $coreVersion
      * @return array
      */
     public function createArtifact(
@@ -88,9 +85,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $coreVersion = null
     ) {
         Serverless::generate($environment);
-
-        exit;
-        //Serverless::deploy();
+        Serverless::deploy();
 
         return [
             'id' => null,
@@ -106,9 +101,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Make an HTTP request and display any validation errors.
      *
-     * @param string $method
-     * @param string $uri
-     *
+     * @param  string  $method
+     * @param  string  $uri
      * @return array
      */
     protected function requestWithErrorHandling($method, $uri, array $json = [])
@@ -119,10 +113,9 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Make a request to the API and return the resulting JSON array.
      *
-     * @param string $method
-     * @param string $uri
-     * @param int    $tries
-     *
+     * @param  string  $method
+     * @param  string  $uri
+     * @param  int  $tries
      * @return array
      */
     protected function request($method, $uri, array $json = [], $tries = 0)

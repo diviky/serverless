@@ -17,9 +17,10 @@
         "deployer"
     ],
     "require": {
-        "laravel/vapor-cli": "1.63"
+        "laravel/vapor-cli": "^1.63"
     },
     "require-dev": {
+        "laravel/pint": "^1.18",
         "phpunit/phpunit": "^8.0|^9.0"
     },
     "autoload": {

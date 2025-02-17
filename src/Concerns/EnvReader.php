@@ -32,7 +32,7 @@ trait EnvReader
                 }
             } else { // V4
                 $adapters = \array_map(function ($adapterClass) {
-                    return new $adapterClass();
+                    return new $adapterClass;
                 }, $adapters);
 
                 $repository = RepositoryBuilder::create()
@@ -48,17 +48,17 @@ trait EnvReader
         }   // V3
 
         return Dotenv::create($paths, $names, new DotenvFactory([
-            new V3EnvConstAdapter(), new V3ServerConstAdapter(),
+            new V3EnvConstAdapter, new V3ServerConstAdapter,
         ]))->safeLoad();
     }
 
-    public static function getProjectEnv($appPath, $environment, $file='.env')
+    public static function getProjectEnv($appPath, $environment, $file = '.env')
     {
         $secrets = [];
 
-        if (\file_exists($appPath . '/' . $file . '.' . $environment)) {
-            $secrets = static::readEnv($file . '.' . $environment, $appPath);
-        } elseif (\file_exists($appPath . '/' . $file)) {
+        if (\file_exists($appPath.'/'.$file.'.'.$environment)) {
+            $secrets = static::readEnv($file.'.'.$environment, $appPath);
+        } elseif (\file_exists($appPath.'/'.$file)) {
             $secrets = static::readEnv($file, $appPath);
         }
 

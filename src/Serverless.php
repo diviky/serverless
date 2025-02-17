@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Diviky\Serverless;
 
 use Diviky\Serverless\Concerns\EnvReader;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\VaporCli\Helpers;
 use Laravel\VaporCli\Manifest;
@@ -19,7 +20,7 @@ class Serverless
     /**
      * Write a fresh main manifest file for the given environment.
      *
-     * @param string $stage
+     * @param  string  $stage
      */
     public static function generate($stage): void
     {
@@ -38,12 +39,12 @@ class Serverless
         $cache = $name . '_' . $stage . '_cache';
         $queues = $env['queues'] ?? false;
 
-        if (false !== $queues) {
-            $queues = true === $queues ? [$queue_name] : $queues;
+        if ($queues !== false) {
+            $queues = $queues === true ? [$queue_name] : $queues;
             $queues = !is_array($queues) ? [$queues] : $queues;
         }
 
-        $docker = 'dockerize' == $runtime || 'docker' == $runtime;
+        $docker = $runtime == 'docker' || $runtime == 'docker-arm';
 
         $env['layers'] = $env['layers'] ?? [];
 
@@ -109,10 +110,18 @@ class Serverless
 
         $bucket = null;
         $bucket_prefix = null;
-        if (isset($env['assets']) && false !== $env['assets']) {
+        if (isset($env['assets']) && $env['assets'] !== false) {
             $bucket = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
             $bucket_prefix = $stage . '/' . $uuid;
-            $environment['MIX_ASSET_URL'] = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
+
+            if (isset($env['asset-domain']) && is_string($env['asset-domain'])) {
+                $assets = Str::beforeLast($env['asset-domain'], '/') . '/' . $bucket_prefix;
+            } else {
+                $assets = 'https://s3.${self:provider.region}.amazonaws.com/' . $bucket . '/' . $bucket_prefix;
+            }
+
+            $environment['ASSET_URL'] = $assets;
+            $environment['MIX_URL'] = $assets;
         }
 
         $environment = \array_merge($environment, self::envVarsToArray($env['environment'] ?? null));
@@ -121,8 +130,8 @@ class Serverless
             'name' => 'aws',
             'region' => $region,
             'stage' => $stage,
-            'runtime' => 'provided',
-            'architecture' => $manifest['architecture'] ?? null,
+            'runtime' => 'provided.al2',
+            'architecture' => $manifest['architecture'] ?? ($runtime == 'docker-arm' ? 'arm64' : null),
             'environment' => $environment,
             'apiGateway' => [
                 'shouldStartNameWithService' => true,
@@ -141,14 +150,15 @@ class Serverless
                             's3:*',
                             'ses:*',
                             'sqs:*',
+                            'dynamodb:*',
+                            'apigateway:*',
                             'kms:Decrypt',
+                            'cloudformation:*',
                             'secretsmanager:GetSecretValue',
                             'ssm:GetParameters',
                             'ssm:GetParameter',
                             'lambda:invokeFunction',
                             'acm:ListCertificates',
-                            'apigateway:*',
-                            'cloudformation:GET',
                             'cloudfront:UpdateDistribution',
                         ],
                         'Resource' => '*',
@@ -168,10 +178,24 @@ class Serverless
                         $image => [
                             'path' => Path::app(),
                             'file' => \file_exists($stage . '.Dockerfile') ? $stage . '.Dockerfile' : '.Dockerfile',
+                            'platform' => $runtime == 'docker-arm' ? 'linux/arm64' : 'linux/amd64',
+                            'buildOptions' => self::formatBuildOptions($stage),
+                            'buildArgs' => self::formatBuildArguments($stage),
                         ],
                     ],
                 ];
+            } elseif (isset($env['image']) && is_string($env['image'])) {
+                $yaml['provider']['ecr'] = [
+                    'images' => [
+                        $image => [
+                            'uri' => $env['image'],
+                        ],
+                    ],
+                ];
+
+                $env['image'] = $image;
             }
+
         } else {
             $yaml['package'] = [
                 'artifact' => 'app.zip',
@@ -182,25 +206,39 @@ class Serverless
         $yaml['resources'] = [];
         $yaml['custom'] = [];
 
+        $yaml['provider']['httpApi'] = [
+            'cors' => true,
+        ];
+
         $web = [
             'handler' => 'vaporHandler.handle',
+            'url' => [
+                'cors' => true,
+            ],
             'timeout' => $env['timeout'] ?? 60,
             'memorySize' => $env['memory'] ?? 1024,
             'reservedConcurrency' => $env['concurrency'] ?? null,
             'provisionedConcurrency' => $env['capacity'] ?? null,
             'layers' => $layers,
             'events' => [
-                ['http' => 'ANY /'],
-                ['http' => 'ANY /{proxy+}'],
-                ['schedule' => [
-                    'enabled' => true,
-                    'rate' => 'rate(5 minutes)',
-                    'input' => [
-                        'vaporWarmer' => true,
-                        'vaporWarmerPing' => true,
-                        'concurrency' => $env['warm'] ?? 10,
+                [
+                    'httpApi' => [
+                        'method' => '*',
+                        'path' => '/',
                     ],
-                ]],
+                ],
+                [
+                    'schedule' => [
+                        'enabled' => true,
+                        'rate' => 'rate(5 minutes)',
+                        'input' => [
+                            'vaporWarmer' => true,
+                            'concurrency' => $env['warm'] ?? 10,
+                            'functionAlias' => $stage,
+                            'functionName' => '!GetAtt webLambdaFunction.Arn',
+                        ],
+                    ],
+                ],
             ],
         ];
 
@@ -242,6 +280,9 @@ class Serverless
                 'schedule' => [
                     'rate' => 'rate(1 minute)',
                     'enabled' => true,
+                    'input' => [
+                        'cli' => 'schedule:run',
+                    ],
                 ],
             ]],
         ];
@@ -254,21 +295,22 @@ class Serverless
             'serverless-deployment-bucket',
         ];
 
-        if (false !== $queues) {
+        if ($queues !== false) {
             foreach ($queues as $queue_name) {
-                $resources[ucfirst($queue_name) . 'Queue'] = [
+                $name = Str::studly($queue_name);
+                $resources[$name . 'Queue'] = [
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name,
                         'VisibilityTimeout' => $env['queue-timeout'] ?? ($env['timeout'] ?? 60),
                         'RedrivePolicy' => [
                             'maxReceiveCount' => 3,
-                            'deadLetterTargetArn' => '!GetAtt ' . ucfirst($queue_name) . 'FailedQueue.Arn',
+                            'deadLetterTargetArn' => '!GetAtt ' . $name . 'FailedQueue.Arn',
                         ],
                     ],
                 ];
 
-                $resources[ucfirst($queue_name) . 'FailedQueue'] = [
+                $resources[$name . 'FailedQueue'] = [
                     'Type' => 'AWS::SQS::Queue',
                     'Properties' => [
                         'QueueName' => $queue_name . '_failed',
@@ -279,7 +321,7 @@ class Serverless
             }
         }
 
-        if (isset($environment['CACHE_DRIVER']) && 'dynamodb' == $environment['CACHE_DRIVER']) {
+        if (isset($environment['CACHE_DRIVER']) && $environment['CACHE_DRIVER'] == 'dynamodb') {
             $resources['cacheTable'] = [
                 'Type' => 'AWS::DynamoDB::Table',
                 'Properties' => [
@@ -296,7 +338,7 @@ class Serverless
                 ],
             ];
 
-            if (isset($env['autoscale']) && false !== $env['autoscale']) {
+            if (isset($env['autoscale']) && $env['autoscale'] !== false) {
                 $yaml['custom']['capacities'] = [[
                     'table' => 'cacheTable',
                     'read' => [
@@ -320,26 +362,20 @@ class Serverless
                 'bucketName' => $bucket,
                 'bucketPrefix' => $bucket_prefix,
                 'localDir' => 'assets',
-                //'acl' => 'public-read',
+                // 'acl' => 'public-read',
             ]];
 
-            if (isset($env['asset-bucket']) && false !== $env['asset-bucket']) {
-                $resources['AssetsBucket'] = [
-                    'Type' => 'AWS::S3::Bucket',
-                    'Properties' => [
-                        'BucketName' => $bucket,
-                        //'AccessControl' => 'PublicRead',
-                    ],
-                ];
+            if (isset($env['asset-bucket']) && $env['asset-bucket'] !== false) {
+                $resources = array_merge((new AssetsBucket)->getResources($bucket), $resources);
             }
 
             \array_push($yaml['plugins'], 'serverless-s3-sync');
         }
 
-        if (isset($env['domain']) && false !== $env['domain']) {
+        if (isset($env['domain']) && $env['domain'] !== false) {
             $domain = $env['domain'];
 
-            if ('*.' == \substr($domain, 0, 2)) {
+            if (\substr($domain, 0, 2) == '*.') {
                 $domain = '${opt:RANDOM_STRING}.' . \substr($domain, 2, -1);
             }
 
@@ -360,9 +396,9 @@ class Serverless
         $fs = null;
         if (isset($env['volumes']) && \count($env['volumes']) > 0) {
             foreach ($env['volumes'] as $volume) {
-                list($local, $access_point) = \explode(':', $volume, 2);
+                [$local, $access_point] = \explode(':', $volume, 2);
 
-                if (!empty($access_point) && 'arn:' != \substr($access_point, 0, 4)) {
+                if (!empty($access_point) && \substr($access_point, 0, 4) != 'arn:') {
                     $access_point = 'arn:aws:elasticfilesystem:${self:provider.region}:' . $account_id . ':access-point/' . $access_point;
                 }
 
@@ -375,7 +411,7 @@ class Serverless
             }
         }
 
-        if (!isset($env['web']) || false !== $env['web']) {
+        if (!isset($env['web']) || $env['web'] !== false) {
             if ($docker) {
                 if (!empty($env['image'])) {
                     $web['image'] = $env['image'];
@@ -400,13 +436,13 @@ class Serverless
             }
 
             if (!empty($env['kms'])) {
-                $web['awsKmsKeyArn'] = ('arn:' != \substr($env['kms'], 0, 4)) ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
+                $web['awsKmsKeyArn'] = (\substr($env['kms'], 0, 4) != 'arn:') ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
             }
 
             $yaml['functions']['web'] = \array_filter($web);
         }
 
-        if (isset($env['queues']) && false !== $queues) {
+        if (isset($env['queues']) && $queues !== false) {
             if ($docker) {
                 if (!empty($env['image'])) {
                     $queue['image'] = $env['image'];
@@ -431,12 +467,12 @@ class Serverless
             }
 
             if (!empty($env['kms'])) {
-                $queue['awsKmsKeyArn'] = ('arn:' != \substr($env['kms'], 0, 4)) ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
+                $queue['awsKmsKeyArn'] = (\substr($env['kms'], 0, 4) != 'arn:') ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
             }
 
             foreach ($queues as $queue_name) {
                 $queue['events'][]['sqs'] = [
-                    'arn' => '!GetAtt ' . ucfirst($queue_name) . 'Queue.Arn',
+                    'arn' => '!GetAtt ' . Str::studly($queue_name) . 'Queue.Arn',
                     'batchSize' => $env['queue-size'] ?? 1,
                 ];
             }
@@ -444,7 +480,7 @@ class Serverless
             $yaml['functions']['queue'] = \array_filter($queue);
         }
 
-        if (isset($env['scheduler']) && false !== $env['scheduler']) {
+        if (isset($env['scheduler']) && $env['scheduler'] !== false) {
             if ($docker) {
                 if (!empty($env['image'])) {
                     $schedule['image'] = $env['image'];
@@ -469,7 +505,7 @@ class Serverless
             }
 
             if (!empty($env['kms'])) {
-                $schedule['awsKmsKeyArn'] = ('arn:' != \substr($env['kms'], 0, 4)) ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
+                $schedule['awsKmsKeyArn'] = (\substr($env['kms'], 0, 4) != 'arn:') ? 'arn:aws:kms:${self:provider.region}:' . $account_id . ':key/' . $env['kms'] : $env['kms'];
             }
 
             $yaml['functions']['schedule'] = \array_filter($schedule);
@@ -502,7 +538,7 @@ class Serverless
     /**
      * Write the given array to disk as the new manifest.
      *
-     * @param null|string $path
+     * @param  null|string  $path
      */
     protected static function write(array $manifest, $path = null): void
     {
@@ -543,8 +579,8 @@ class Serverless
 
         $variables = [];
         foreach ($environments as $environment) {
-            if (false !== \strpos($environment, '=')) {
-                list($key, $value) = \explode('=', $environment, 2);
+            if (\strpos($environment, '=') !== false) {
+                [$key, $value] = \explode('=', $environment, 2);
                 $variables[$key] = $value;
             }
         }
@@ -560,7 +596,7 @@ class Serverless
             'Type' => 'AWS::ElasticLoadBalancingV2::TargetGroup',
             'Properties' => [
                 'TargetType' => 'lambda',
-                'Targets' => [['Id' => ['Fn::GetAtt' => [ucfirst($name) . 'LambdaFunction', 'Arn']]]],
+                'Targets' => [['Id' => ['Fn::GetAtt' => [Str::studly($name) . 'LambdaFunction', 'Arn']]]],
                 'Name' => $data['name'],
                 'Tags' => [
                     [
@@ -583,5 +619,54 @@ class Serverless
                 'Matcher' => ['HttpCode' => '200'],
             ],
         ];
+    }
+
+    /**
+     * Format the Docker CLI build arguments.
+     *
+     * @return array<int, string>
+     */
+    public static function formatBuildArguments($environment)
+    {
+        $cliBuildArgs = array_merge(
+            ['__VAPOR_RUNTIME=' . Manifest::runtime($environment)],
+            array_filter(Manifest::dockerBuildArgs($environment), function ($value) {
+                return !Str::startsWith($value, '__VAPOR_RUNTIME');
+            })
+        );
+
+        return Collection::make($cliBuildArgs)
+            ->mapWithKeys(function ($value) {
+                [$key, $value] = explode('=', $value, 2);
+
+                return [$key => $value];
+            })->toArray();
+
+    }
+
+    public static function formatBuildOptions($environment)
+    {
+        $cliBuildOptions = array_filter(Manifest::dockerBuildOptions($environment), function ($value) {
+            return !Str::startsWith($value, 'platform');
+        });
+
+        $cliBuildOptions = Collection::make($cliBuildOptions)
+            ->mapWithKeys(function ($value) {
+                if (!str_contains($value, '=')) {
+                    return [$value => null];
+                }
+
+                [$key, $value] = explode('=', $value, 2);
+
+                return [$key => $value];
+            });
+
+        $options = [];
+        foreach ($cliBuildOptions as $key => $value) {
+            $options[] = '--' . $key;
+            $options[] = $value;
+        }
+
+        return $options;
     }
 }

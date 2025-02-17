@@ -12,12 +12,10 @@ trait ExecuteTrait
 {
     /**
      * Execute the command.
-     *
-     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $this->startedAt = new DateTime();
+        $this->startedAt = new DateTime;
 
         $_ENV['VAPOR_API_TOKEN'] = \uniqid();
 
@@ -25,7 +23,7 @@ trait ExecuteTrait
 
         Helpers::app()->instance('input', $this->input = $input);
         Helpers::app()->instance('output', $this->output = $output);
-        Helpers::app()->instance('manifest', \getcwd() . '/serverless.yml');
+        Helpers::app()->instance('manifest', \getcwd().'/serverless.yml');
 
         $this->configureOutputStyles($output);
 

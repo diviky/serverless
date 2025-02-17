@@ -8,8 +8,8 @@ use Laravel\VaporCli\Helpers;
 
 class CollectSecrets
 {
-    use ParticipatesInBuildProcess;
     use EnvReader;
+    use ParticipatesInBuildProcess;
 
     /**
      * Execute the build process step.
@@ -21,8 +21,8 @@ class CollectSecrets
         $secrets = static::getProjectEnv($this->appPath, $this->environment, '.secret');
 
         $this->files->put(
-            $this->appPath . '/vaporSecrets.php',
-            '<?php return ' . \var_export($secrets, true) . ';'
+            $this->appPath.'/vaporSecrets.php',
+            '<?php return '.\var_export($secrets, true).';'
         );
 
         return $secrets;

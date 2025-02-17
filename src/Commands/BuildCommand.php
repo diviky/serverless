@@ -4,6 +4,7 @@ namespace Diviky\Serverless\Commands;
 
 use DateTime;
 use Diviky\Serverless\BuildProcess\CollectSecrets;
+use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
 use Diviky\Serverless\Concerns\ExecuteTrait;
 use Laravel\VaporCli\BuildProcess\BuildContainerImage;
 use Laravel\VaporCli\BuildProcess\CompressApplication;
@@ -19,7 +20,7 @@ use Laravel\VaporCli\BuildProcess\InjectErrorPages;
 use Laravel\VaporCli\BuildProcess\InjectHandlers;
 use Laravel\VaporCli\BuildProcess\InjectRdsCertificate;
 use Laravel\VaporCli\BuildProcess\ProcessAssets;
-use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
+use Laravel\VaporCli\BuildProcess\RemovePintBinary;
 use Laravel\VaporCli\BuildProcess\RemoveVendorPlatformCheck;
 use Laravel\VaporCli\BuildProcess\SetBuildEnvironment;
 use Laravel\VaporCli\BuildProcess\ValidateManifest;
@@ -42,38 +43,43 @@ class BuildCommand extends VaporBuildCommand
 
         Helpers::line('Building project...');
 
-
         if (Manifest::usesContainerImage($this->argument('environment')) &&
-            ! file_exists($file = Path::dockerfile($this->argument('environment')))) {
+            !file_exists($file = Path::dockerfile($this->argument('environment')))) {
             Helpers::abort("Please create a Dockerfile at [$file].");
         }
 
-        $startedAt = new DateTime();
+        $startedAt = new DateTime;
 
         collect([
             new ValidateManifest($this->argument('environment')),
-            new CopyApplicationToBuildPath(),
-            new CollectSecrets($this->argument('environment')),
-            new HarmonizeConfigurationFiles(),
-            //new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
+            new CopyApplicationToBuildPath,
+            new HarmonizeConfigurationFiles,
+            // new SetBuildEnvironment($this->argument('environment'), $this->option('asset-url')),
             new ExecuteBuildCommands($this->argument('environment')),
             new ValidateOctaneDependencies($this->argument('environment')),
             new ConfigureArtisan($this->argument('environment')),
             new ConfigureComposerAutoloader($this->argument('environment')),
-            new RemoveIgnoredFiles(),
-            new RemoveVendorPlatformCheck(),
+            new RemoveIgnoredFiles,
+            new RemovePintBinary,
+            new RemoveVendorPlatformCheck,
             new ProcessAssets($this->option('asset-url')),
-            new ExtractAssetsToSeparateDirectory(),
+            new ExtractAssetsToSeparateDirectory,
             new InjectHandlers($this->argument('environment')),
-            new InjectErrorPages(),
-            new InjectRdsCertificate(),
+            new CollectSecrets($this->argument('environment')),
+            new InjectErrorPages,
+            new InjectRdsCertificate,
             new ExtractVendorToSeparateDirectory($this->argument('environment')),
             new CompressApplication($this->argument('environment')),
             new CompressVendor($this->argument('environment')),
-            //new BuildContainerImage($this->argument('environment')),
+            new BuildContainerImage(
+                $this->argument('environment'),
+                $this->option('build-arg'),
+                $this->option('build-option'),
+                Manifest::dockerBuildArgs($this->argument('environment'))
+            ),
         ])->each->__invoke();
 
-        $time = (new DateTime())->diff($startedAt)->format('%im%Ss');
+        $time = (new DateTime)->diff($startedAt)->format('%im%Ss');
 
         Helpers::line();
         Helpers::line('<info>Project built successfully.</info> (' . $time . ')');

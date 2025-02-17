@@ -91,5 +91,6 @@ $app->add(new Commands\InitCommand());
 $app->add(new Commands\BuildCommand());
 $app->add(new Commands\DeployCommand());
 $app->add(new Commands\GenerateCommand());
+$app->add(new Commands\PushCommand());
 
 $app->run();

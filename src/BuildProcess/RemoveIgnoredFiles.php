@@ -19,7 +19,7 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
     {
         Helpers::step('<options=bold>Removing Ignored Files</>');
 
-        // $this->removeDefaultIgnoredFiles();
+        $this->removeDefaultIgnoredFiles();
         $this->removeDefaultIgnoredDirectories();
         $this->removeSymfonyTests();
 
@@ -39,7 +39,7 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
 
                 $this->files->deleteDirectory($directory . '/' . $filePattern, $preserve = false);
             } elseif ($this->files->isDirectory($directory)) {
-                $files = (new Finder())
+                $files = (new Finder)
                     ->in($directory)
                     ->ignoreDotFiles(false)
                     ->name($filePattern);
