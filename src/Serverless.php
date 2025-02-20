@@ -235,7 +235,7 @@ class Serverless
                             'vaporWarmer' => true,
                             'concurrency' => $env['warm'] ?? 10,
                             'functionAlias' => $stage,
-                            'functionName' => '!GetAtt webLambdaFunction.Arn',
+                            'functionName' => 'arn:aws:lambda:${self:provider.region}:${aws:accountId}:function:' . $name . '-' . $stage . '-web',
                         ],
                     ],
                 ],
