@@ -36,7 +36,6 @@ class Serverless
         $account_id = $manifest['id'];
 
         $queue_name = $stage . '_default';
-        $cache = $name . '_' . $stage . '_cache';
         $queues = $env['queues'] ?? false;
 
         if ($queues !== false) {
@@ -321,11 +320,14 @@ class Serverless
             }
         }
 
-        if (isset($environment['CACHE_DRIVER']) && $environment['CACHE_DRIVER'] == 'dynamodb') {
+        if (isset($environment['CACHE_STORE'])
+            && $environment['CACHE_STORE'] == 'dynamodb'
+        && (!isset($env['cache-table']) || $env['cache-table'] !== false)
+        ) {
             $resources['cacheTable'] = [
                 'Type' => 'AWS::DynamoDB::Table',
                 'Properties' => [
-                    'TableName' => $cache,
+                    'TableName' => $env['cache-table'] ?? 'cache',
                     'AttributeDefinitions' => [[
                         'AttributeName' => 'key',
                         'AttributeType' => 'S',
@@ -341,6 +343,45 @@ class Serverless
             if (isset($env['autoscale']) && $env['autoscale'] !== false) {
                 $yaml['custom']['capacities'] = [[
                     'table' => 'cacheTable',
+                    'read' => [
+                        'minimum' => 1,
+                        'maximum' => 1000,
+                        'usage' => 0.75,
+                    ],
+                    'write' => [
+                        'minimum' => 40,
+                        'maximum' => 200,
+                        'usage' => 0.5,
+                    ],
+                ]];
+
+                \array_push($yaml['plugins'], 'serverless-dynamodb-autoscaling');
+            }
+        }
+
+        if (isset($environment['SESSION_DRIVER'])
+        && $environment['SESSION_DRIVER'] == 'dynamodb'
+            && (!isset($env['session-table']) || $env['session-table'] !== false)
+        ) {
+            $resources['sessionTable'] = [
+                'Type' => 'AWS::DynamoDB::Table',
+                'Properties' => [
+                    'TableName' => $env['session-table'] ?? 'sessions',
+                    'AttributeDefinitions' => [[
+                        'AttributeName' => 'id',
+                        'AttributeType' => 'S',
+                    ]],
+                    'KeySchema' => [[
+                        'AttributeName' => 'id',
+                        'KeyType' => 'HASH',
+                    ]],
+                    'BillingMode' => 'PAY_PER_REQUEST',
+                ],
+            ];
+
+            if (isset($env['autoscale']) && $env['autoscale'] !== false) {
+                $yaml['custom']['capacities'] = [[
+                    'table' => 'sessionTable',
                     'read' => [
                         'minimum' => 1,
                         'maximum' => 1000,
