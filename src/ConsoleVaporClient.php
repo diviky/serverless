@@ -2,9 +2,7 @@
 
 namespace Diviky\Serverless;
 
-use Laravel\VaporCli\Aws\AwsStorageProvider;
 use Laravel\VaporCli\ConsoleVaporClient as VaporConsoleVaporClient;
-use Laravel\VaporCli\Helpers;
 
 class ConsoleVaporClient extends VaporConsoleVaporClient
 {
@@ -57,45 +55,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 'uses_vanity_domain' => $usesVanityDomain,
             ],
         ];
-    }
-
-    /**
-     * Get a pre-signed storage URL for the given project.
-     *
-     * @param  int  $projectId
-     * @param  string  $uuid
-     * @param  string  $environment
-     * @param  string  $file
-     * @param  string  $commit
-     * @param  string  $commitMessage
-     * @param  string  $vendorHash
-     * @param  string  $cliVersion
-     * @param  string  $coreVersion
-     * @return array
-     */
-    public function createArtifact(
-        $projectId,
-        $uuid,
-        $environment,
-        $file = null,
-        $commit = null,
-        $commitMessage = null,
-        $vendorHash = null,
-        $cliVersion = null,
-        $coreVersion = null
-    ) {
-        Serverless::generate($environment);
-        Serverless::deploy();
-
-        return [
-            'id' => null,
-        ];
-
-        $artifact = [];
-
-        Helpers::app(AwsStorageProvider::class)->store($artifact['url'], [], $file, true);
-
-        return $artifact;
     }
 
     /**

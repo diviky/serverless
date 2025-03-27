@@ -2,10 +2,13 @@
 
 namespace Diviky\Serverless\Commands;
 
+use DateTime;
 use Diviky\Serverless\Concerns\ExecuteTrait;
 use Diviky\Serverless\Serverless;
+use Illuminate\Filesystem\Filesystem;
 use Laravel\VaporCli\Commands\BuildCommand as VaporBuildCommand;
 use Laravel\VaporCli\Helpers;
+use Laravel\VaporCli\Path;
 use Symfony\Component\Console\Input\InputArgument;
 
 class PushCommand extends VaporBuildCommand
@@ -17,10 +20,16 @@ class PushCommand extends VaporBuildCommand
      */
     public function handle()
     {
+        $startedAt = new DateTime;
+
         Serverless::deploy($this->argument('args'));
 
+        (new Filesystem)->deleteDirectory(Path::vapor());
+
+        $time = (new DateTime)->diff($startedAt)->format('%im%Ss');
+
         Helpers::line();
-        Helpers::line('<info>Serverless file created successfully.</info>');
+        Helpers::line('<info>Project deployed successfully.</info> (' . $time . ')');
     }
 
     /**
