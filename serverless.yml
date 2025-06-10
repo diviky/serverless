@@ -36,6 +36,7 @@ environments:
       #- APP_CONFIG_CACHE=/mnt/local/storage/bootstrap/cache/config.php
     assets: com-diviky.ap-south-1.assets
     asset-bucket: true # create aws bucket
+    separate-assets: true
     warm: 10
     timeout: 30
     size: 1024

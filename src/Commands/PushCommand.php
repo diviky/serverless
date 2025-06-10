@@ -4,7 +4,7 @@ namespace Diviky\Serverless\Commands;
 
 use DateTime;
 use Diviky\Serverless\Concerns\ExecuteTrait;
-use Diviky\Serverless\Serverless;
+use Diviky\Serverless\Serverless\Serverless;
 use Illuminate\Filesystem\Filesystem;
 use Laravel\VaporCli\Commands\BuildCommand as VaporBuildCommand;
 use Laravel\VaporCli\Helpers;

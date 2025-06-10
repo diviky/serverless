@@ -1,0 +1,68 @@
+import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
+
+export interface CustomDomainProps {
+  domainName: string;
+  api: apigateway.RestApi;
+  certificateArn?: string;
+  hostedZoneId?: string;
+  hostedZoneName?: string;
+  createCertificate?: boolean;
+}
+
+export class CustomDomainConstruct extends Construct {
+  public readonly domainName: apigateway.DomainName;
+
+  constructor(scope: Construct, id: string, props: CustomDomainProps) {
+    super(scope, id);
+
+    // Get or create Certificate
+    let certificate: acm.ICertificate;
+
+    if (props.certificateArn) {
+      certificate = acm.Certificate.fromCertificateArn(
+        this, 'Certificate', props.certificateArn
+      );
+    } else if (props.createCertificate && props.hostedZoneId && props.hostedZoneName) {
+      // For this to work, you must have a hosted zone set up
+      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+        hostedZoneId: props.hostedZoneId,
+        zoneName: props.hostedZoneName,
+      });
+
+      certificate = new acm.DnsValidatedCertificate(this, 'Certificate', {
+        domainName: props.domainName,
+        hostedZone,
+        region: 'us-east-1', // Must be us-east-1 for CloudFront
+      });
+    } else {
+      throw new Error('Either certificateArn or (createCertificate, hostedZoneId, and hostedZoneName) must be provided');
+    }
+
+    // Create custom domain for API Gateway
+    this.domainName = props.api.addDomainName('CustomDomain', {
+      domainName: props.domainName,
+      certificate,
+    });
+
+    // Create Route53 record if hostedZoneId is provided
+    if (props.hostedZoneId && props.hostedZoneName) {
+      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'ApiHostedZone', {
+        hostedZoneId: props.hostedZoneId,
+        zoneName: props.hostedZoneName,
+      });
+
+      new route53.ARecord(this, 'ApiAliasRecord', {
+        zone: hostedZone,
+        recordName: props.domainName,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.ApiGatewayDomain(this.domainName)
+        ),
+      });
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Diviky\Serverless;
+namespace Diviky\Serverless\Serverless;
 
 use Diviky\Serverless\Concerns\EnvReader;
 use Illuminate\Support\Collection;

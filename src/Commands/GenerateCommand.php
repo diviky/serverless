@@ -3,7 +3,7 @@
 namespace Diviky\Serverless\Commands;
 
 use Diviky\Serverless\Concerns\ExecuteTrait;
-use Diviky\Serverless\Serverless;
+use Diviky\Serverless\Serverless\Serverless;
 use Laravel\VaporCli\Commands\BuildCommand as VaporBuildCommand;
 use Laravel\VaporCli\Helpers;
 use Symfony\Component\Console\Input\InputArgument;

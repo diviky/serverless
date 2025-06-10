@@ -1,0 +1,42 @@
+import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+
+export interface QueueProps {
+  name: string;
+  timeoutSeconds: number;
+  retryCount?: number;
+  retentionDays?: number;
+}
+
+export class QueueConstruct extends Construct {
+  public readonly queue: sqs.Queue;
+  public readonly deadLetterQueue: sqs.Queue;
+
+  constructor(scope: Construct, id: string, props: QueueProps) {
+    super(scope, id);
+
+    const retryCount = props.retryCount || 3;
+    const retentionDays = props.retentionDays || 7;
+
+    // Create the DLQ first
+    this.deadLetterQueue = new sqs.Queue(this, `${id}FailedQueue`, {
+      queueName: `${props.name}_failed`,
+      visibilityTimeout: cdk.Duration.seconds(props.timeoutSeconds),
+      retentionPeriod: cdk.Duration.days(retentionDays),
+    });
+
+    // Create the main queue
+    this.queue = new sqs.Queue(this, `${id}Queue`, {
+      queueName: props.name,
+      visibilityTimeout: cdk.Duration.seconds(props.timeoutSeconds),
+    });
+
+    // Configure DLQ redrive policy
+    const cfnQueue = this.queue.node.defaultChild as sqs.CfnQueue;
+    cfnQueue.redrivePolicy = {
+      maxReceiveCount: retryCount,
+      deadLetterTargetArn: this.deadLetterQueue.queueArn,
+    };
+  }
+}

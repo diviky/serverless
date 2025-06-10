@@ -1,5 +1,5 @@
 image:
-  name: 097427577457.dkr.ecr.ap-south-1.amazonaws.com/pipeline81:latest
+  name: pipeline81:latest
   aws:
     access-key: $AWS_ACCESS_KEY_ID
     secret-key: $AWS_SECRET_ACCESS_KEY

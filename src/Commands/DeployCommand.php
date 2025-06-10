@@ -3,26 +3,34 @@
 namespace Diviky\Serverless\Commands;
 
 use Diviky\Serverless\Concerns\ExecuteTrait;
-use Diviky\Serverless\Serverless;
+use Illuminate\Support\Str;
 use Laravel\VaporCli\Commands\DeployCommand as VaporDeployCommand;
-use Laravel\VaporCli\Helpers;
+use Laravel\VaporCli\Path;
 
 class DeployCommand extends VaporDeployCommand
 {
     use ExecuteTrait;
 
-    protected function uploadArtifact($environment, $uuid)
-    {
-        Helpers::line();
-
-        Serverless::generate($environment);
-        Serverless::deploy();
-    }
-
     /**
-     * Serve the artifact's assets at the given path.
+     * Build the project and create a new artifact for the deployment.
      *
-     * @return void
+     * @return array
      */
-    protected function serveAssets(array $artifact) {}
+    protected function buildProject(array $project)
+    {
+        $uuid = (string) Str::uuid();
+
+        $this->call('build', [
+            'environment' => $this->argument('environment'),
+            '--asset-url' => $this->assetDomain($project) . '/' . $uuid,
+            '--manifest' => Path::manifest(),
+            '--build-arg' => $this->option('build-arg'),
+            '--build-option' => $this->option('build-option'),
+        ]);
+
+        return $this->uploadArtifact(
+            $this->argument('environment'),
+            $uuid
+        );
+    }
 }

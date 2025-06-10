@@ -1,0 +1,73 @@
+import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as iam from 'aws-cdk-lib/aws-iam';
+
+export interface QueueFunctionProps {
+  name: string;
+  stage: string;
+  runtime: string;
+  memory: number;
+  timeout: number;
+  environment: Record<string, string>;
+  role: iam.IRole;
+  queues: sqs.Queue[];
+  batchSize?: number;
+}
+
+export class QueueFunctionConstruct extends Construct {
+  public readonly function: lambda.Function;
+
+  constructor(scope: Construct, id: string, props: QueueFunctionProps) {
+    super(scope, id);
+
+    // Get runtime from string
+    const runtime = this.getRuntimeFromString(props.runtime);
+
+    // Add console environment variable
+    const environment = {
+      ...props.environment,
+      APP_RUNNING_IN_CONSOLE: 'true',
+    };
+
+    // Create Queue Function
+    this.function = new lambda.Function(this, 'Function', {
+      functionName: `${props.name}-${props.stage}-queue`,
+      runtime: runtime,
+      memorySize: props.memory,
+      timeout: cdk.Duration.seconds(props.timeout),
+      handler: 'vaporHandler.handle',
+      code: lambda.Code.fromAsset('app.zip'),
+      role: props.role,
+      environment: environment,
+    });
+
+    // Add SQS event sources to Queue function
+    props.queues.forEach((queue, index) => {
+      new lambda.EventSourceMapping(this, `EventSource${index}`, {
+        target: this.function,
+        eventSourceArn: queue.queueArn,
+        batchSize: props.batchSize || 1,
+      });
+    });
+  }
+
+  private getRuntimeFromString(runtime: string): lambda.Runtime {
+    switch (runtime) {
+      case 'php-8.2':
+        return lambda.Runtime.PROVIDED_AL2;
+      case 'php-8.1':
+        return lambda.Runtime.PROVIDED_AL2;
+      case 'php-8.0':
+        return lambda.Runtime.PROVIDED_AL2;
+      case 'php-7.4':
+        return lambda.Runtime.PROVIDED_AL2;
+      case 'docker':
+      case 'docker-arm':
+        return lambda.Runtime.FROM_IMAGE;
+      default:
+        return lambda.Runtime.PROVIDED_AL2;
+    }
+  }
+}

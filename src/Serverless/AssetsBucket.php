@@ -1,6 +1,6 @@
 <?php
 
-namespace Diviky\Serverless;
+namespace Diviky\Serverless\Serverless;
 
 class AssetsBucket
 {

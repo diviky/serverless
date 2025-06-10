@@ -1,0 +1,54 @@
+import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+
+export interface AssetBucketProps {
+  bucketName: string;
+  publicRead?: boolean;
+  createDistribution?: boolean;
+}
+
+export class AssetBucketConstruct extends Construct {
+  public readonly bucket: s3.Bucket;
+  public readonly distribution?: cloudfront.Distribution;
+
+  constructor(scope: Construct, id: string, props: AssetBucketProps) {
+    super(scope, id);
+
+    // Create the assets bucket
+    this.bucket = new s3.Bucket(this, 'Bucket', {
+      bucketName: props.bucketName,
+      publicReadAccess: props.publicRead !== false,
+      blockPublicAccess: props.publicRead === false
+        ? s3.BlockPublicAccess.BLOCK_ALL
+        : s3.BlockPublicAccess.BLOCK_ACLS,
+      cors: [
+        {
+          allowedMethods: [
+            s3.HttpMethods.GET,
+            s3.HttpMethods.HEAD,
+          ],
+          allowedOrigins: ['*'],
+          allowedHeaders: ['*'],
+        },
+      ],
+    });
+
+    // Optionally create a CloudFront distribution for the bucket
+    if (props.createDistribution) {
+      this.distribution = new cloudfront.Distribution(this, 'Distribution', {
+        defaultBehavior: {
+          origin: new origins.S3Origin(this.bucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+          cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+        defaultRootObject: 'index.html',
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_ALL,
+      });
+    }
+  }
+}
