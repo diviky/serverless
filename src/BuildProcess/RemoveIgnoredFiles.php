@@ -47,9 +47,6 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
         if (strpos($pattern, '*') === false) {
             $fullPath = $appPath . '/' . $pattern;
 
-            Helpers::step('<comment>Checking pattern:</comment> ' . $pattern);
-            Helpers::step('<comment>Full path:</comment> ' . $fullPath);
-
             if ($this->files->exists($fullPath)) {
                 if ($this->files->isDirectory($fullPath)) {
                     Helpers::step('<comment>Removing Ignored Directory:</comment> ' . $pattern . '/');

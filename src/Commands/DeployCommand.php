@@ -3,7 +3,6 @@
 namespace Diviky\Serverless\Commands;
 
 use Diviky\Serverless\Concerns\ExecuteTrait;
-use Illuminate\Support\Str;
 use Laravel\VaporCli\Commands\DeployCommand as VaporDeployCommand;
 use Laravel\VaporCli\Path;
 
@@ -18,7 +17,7 @@ class DeployCommand extends VaporDeployCommand
      */
     protected function buildProject(array $project)
     {
-        $uuid = (string) Str::uuid();
+        $uuid = (string) time();
 
         $this->call('build', [
             'environment' => $this->argument('environment'),

@@ -111,21 +111,22 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $coreVersion = null
     ) {
         // Get AWS profile and region from serverless.yml or environment
-        $awsProfile = $this->getAwsProfile();
-        $awsRegion = $this->getAwsRegion();
+        $repositoryName = Manifest::image($environment);
+        $bucketName = Manifest::artifactBucket($environment);
+        $artifactKey = 'releases/' . $uuid . '/';
 
         // Generate ECR details using AWS profile
-        $ecrDetails = $this->generateEcrDetails($awsProfile, $awsRegion, $environment);
+        $ecrDetails = $this->generateEcrDetails($repositoryName);
 
         // Generate S3 pre-signed URLs for artifact uploads
         if ($vendorHash) {
-            $vendor_url = $this->generateS3PresignedUrls($awsProfile, $awsRegion, $environment, $vendorHash);
+            $vendor_url = $this->generateS3PresignedUrls($bucketName, $artifactKey . 'vendor.zip');
         } else {
             $vendor_url = null;
         }
 
         if ($file) {
-            $artifact_url = $this->generateS3PresignedUrls($awsProfile, $awsRegion, $environment, $file);
+            $artifact_url = $this->generateS3PresignedUrls($bucketName, $artifactKey . 'app.zip');
         } else {
             $artifact_url = null;
         }
@@ -138,6 +139,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'container_image_tag' => $ecrDetails['image_tag'],
             'url' => $artifact_url,
             'uses_container_image' => is_null($file),
+            'bucket' => $bucketName,
+            'path' => $artifactKey,
         ];
 
         if ($file) {
@@ -220,9 +223,13 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      * @param  string  $uuid
      * @return array
      */
-    protected function generateEcrDetails($profile, $region, $environment, $tag = 'latest')
+    protected function generateEcrDetails($repositoryName, $tag = 'latest')
     {
+        $profile = $this->getAwsProfile();
+        $region = $this->getAwsRegion();
+
         $tag = $tag ?? 'latest';
+        $repositoryName = strtolower($repositoryName);
 
         try {
             // Configure AWS clients with fallback to default profile
@@ -248,7 +255,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             }
 
             // Repository name based on project
-            $repositoryName = strtolower(Manifest::image($environment));
             $repositoryUri = "{$accountId}.dkr.ecr.{$region}.amazonaws.com/{$repositoryName}";
 
             // Create ECR client
@@ -297,8 +303,11 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      * @param  string|null  $vendorHash
      * @return array
      */
-    protected function generateS3PresignedUrls($profile, $region, $environment, $artifactKey)
+    protected function generateS3PresignedUrls($bucketName, $artifactKey)
     {
+        $profile = $this->getAwsProfile();
+        $region = $this->getAwsRegion();
+
         try {
             // Configure AWS clients with fallback to default profile
             $clientConfig = [
@@ -313,8 +322,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
 
             // Create S3 client
             $s3Client = new \Aws\S3\S3Client($clientConfig);
-
-            $bucketName = Manifest::bucket($environment);
 
             // Check if bucket exists, create if it doesn't
             try {

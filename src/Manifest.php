@@ -33,7 +33,16 @@ class Manifest extends \Laravel\VaporCli\Manifest
     public static function bucket($environment)
     {
         $region = static::current()['region'] ?? 'us-east-1';
+        $id = static::current()['id'] ?? time();
 
-        return static::environment($environment)['assets'] ?? "vapor-{$region}-assets-" . time();
+        return static::environment($environment)['assets'] ?? "vapor-{$region}-assets-{$id}";
+    }
+
+    public static function artifactBucket($environment)
+    {
+        $region = static::current()['region'] ?? 'us-east-1';
+        $id = static::current()['id'] ?? time();
+
+        return static::environment($environment)['artifact-bucket'] ?? "vapor-{$region}-artifacts-{$id}";
     }
 }
