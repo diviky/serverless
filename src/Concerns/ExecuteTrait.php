@@ -23,7 +23,7 @@ trait ExecuteTrait
 
         Helpers::app()->instance('input', $this->input = $input);
         Helpers::app()->instance('output', $this->output = $output);
-        Helpers::app()->instance('manifest', \getcwd().'/serverless.yml');
+        Helpers::app()->instance('manifest', \getcwd() . '/vapor.yml');
 
         $this->configureOutputStyles($output);
 

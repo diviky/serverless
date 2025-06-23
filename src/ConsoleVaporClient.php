@@ -53,8 +53,10 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'project' => [
                 'id' => $name,
                 'name' => $name,
-                'region' => $region,
-                'project' => $name,
+                'provider' => [
+                    'region' => $region,
+                ],
+                'service' => $name,
                 'uses_vanity_domain' => $usesVanityDomain,
             ],
         ];
@@ -169,8 +171,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
 
         try {
             $manifest = Manifest::current();
-            if (isset($manifest['profile'])) {
-                $profile = $manifest['profile'];
+            if (isset($manifest['provider']['profile'])) {
+                $profile = $manifest['provider']['profile'];
             }
         } catch (\Exception $e) {
             // Fallback if manifest reading fails
@@ -191,8 +193,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     {
         try {
             $manifest = Manifest::current();
-            if (isset($manifest['aws']['region'])) {
-                return $manifest['aws']['region'];
+            if (isset($manifest['provider']['region'])) {
+                return $manifest['provider']['region'];
             }
             if (isset($manifest['region'])) {
                 return $manifest['region'];
@@ -213,11 +215,11 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     {
         try {
             $manifest = Manifest::current();
-            if (isset($manifest['aws'])) {
+            if (isset($manifest['provider'])) {
                 return [
-                    'key' => $manifest['aws']['access_key'] ?? env('AWS_ACCESS_KEY_ID'),
-                    'secret' => $manifest['aws']['secret_key'] ?? env('AWS_SECRET_ACCESS_KEY'),
-                    'region' => $manifest['aws']['region'] ?? $this->getAwsRegion(),
+                    'key' => $manifest['provider']['access_key'] ?? env('AWS_ACCESS_KEY_ID'),
+                    'secret' => $manifest['provider']['secret_key'] ?? env('AWS_SECRET_ACCESS_KEY'),
+                    'region' => $manifest['provider']['region'] ?? $this->getAwsRegion(),
                 ];
             }
         } catch (\Exception $e) {
