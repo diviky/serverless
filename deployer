@@ -11,6 +11,7 @@ use Dotenv\Repository\Adapter\ServerConstAdapter as V4orV5ServerConstAdapter;
 use Dotenv\Repository\RepositoryBuilder;
 use Illuminate\Container\Container;
 use Laravel\VaporCli\Application;
+use Laravel\VaporCli\Commands as VaporCommands;
 
 
 /**
@@ -80,5 +81,10 @@ $app->add(new Commands\DeployCommand());
 $app->add(new Commands\GenerateCommand());
 $app->add(new Commands\PushCommand());
 $app->add(new Commands\ArtifactCommand());
+
+// Environments...
+$app->add(new Commands\EnvPullCommand);
+$app->add(new Commands\EnvPushCommand);
+$app->add(new Commands\EnvDeleteCommand);
 
 $app->run();

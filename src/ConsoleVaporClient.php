@@ -243,25 +243,12 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     protected function generateEcrDetails($repositoryName, $tag = 'latest')
     {
         $credentials = $this->getAwsCredentials();
-        $profile = $this->getAwsProfile();
 
         $tag = $tag ?? 'latest';
         $repositoryName = strtolower($repositoryName);
 
-        // Configure AWS clients with credentials or profile
-        $clientConfig = [
-            'region' => $credentials['region'],
-            'version' => 'latest',
-        ];
-
-        if (!empty($credentials['key']) && !empty($credentials['secret'])) {
-            $clientConfig['credentials'] = [
-                'key' => $credentials['key'],
-                'secret' => $credentials['secret'],
-            ];
-        } elseif ($profile !== 'default') {
-            $clientConfig['profile'] = $profile;
-        }
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
 
         // Create STS client to get account ID
         $stsClient = new \Aws\Sts\StsClient($clientConfig);
@@ -271,7 +258,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $accountId = $identity['Account'];
 
         if (empty($accountId)) {
-            throw new \Exception('Unable to get AWS Account ID');
+            Helpers::abort('Unable to get AWS Account ID.');
         }
 
         // Repository name based on project
@@ -287,6 +274,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             ]);
         } catch (\Aws\Exception\AwsException $e) {
             // Repository might already exist, ignore error
+            Helpers::abort('Unable to create ECR repository. ' . $e->getMessage());
         }
 
         // Get ECR authorization token
@@ -294,7 +282,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $authData = $authResult['authorizationData'][0] ?? null;
 
         if (!$authData || empty($authData['authorizationToken'])) {
-            throw new \Exception('Unable to get ECR authorization token');
+            Helpers::abort('Unable to get ECR authorization token.');
         }
 
         return [
@@ -317,23 +305,10 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     protected function generateS3PresignedUrls($bucketName, $artifactKey)
     {
         $credentials = $this->getAwsCredentials();
-        $profile = $this->getAwsProfile();
 
         try {
-            // Configure AWS clients with credentials or profile
-            $clientConfig = [
-                'region' => $credentials['region'],
-                'version' => 'latest',
-            ];
-
-            if (!empty($credentials['key']) && !empty($credentials['secret'])) {
-                $clientConfig['credentials'] = [
-                    'key' => $credentials['key'],
-                    'secret' => $credentials['secret'],
-                ];
-            } elseif ($profile !== 'default') {
-                $clientConfig['profile'] = $profile;
-            }
+            // Get AWS client configuration
+            $clientConfig = $this->getAwsClientConfig();
 
             // Create S3 client
             $s3Client = new \Aws\S3\S3Client($clientConfig);
@@ -350,8 +325,9 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                             'LocationConstraint' => $credentials['region'] !== 'us-east-1' ? $credentials['region'] : null,
                         ],
                     ]);
-                } catch (\Aws\Exception\AwsException $createException) {
+                } catch (\Aws\Exception\AwsException $e) {
                     // Handle bucket creation error
+                    Helpers::abort('Unable to create S3 bucket. ' . $e->getMessage());
                 }
             }
 
@@ -366,7 +342,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return $artifactUrl;
 
         } catch (\Exception $e) {
-            return null;
+            Helpers::abort('Unable to upload deployment artifact to cloud storage. ' . $e->getMessage());
         }
     }
 
@@ -423,5 +399,708 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'steps' => [],
             'status' => null,
         ];
+    }
+
+    /**
+     * Get AWS client configuration.
+     *
+     * @return array
+     */
+    protected function getAwsClientConfig()
+    {
+        $credentials = $this->getAwsCredentials();
+        $profile = $this->getAwsProfile();
+
+        $clientConfig = [
+            'region' => $credentials['region'],
+            'version' => 'latest',
+        ];
+
+        if (!empty($credentials['key']) && !empty($credentials['secret'])) {
+            $clientConfig['credentials'] = [
+                'key' => $credentials['key'],
+                'secret' => $credentials['secret'],
+            ];
+        } elseif ($profile !== 'default') {
+            $clientConfig['profile'] = $profile;
+        }
+
+        return $clientConfig;
+    }
+
+    /**
+     * Get the environment variables for the given environment.
+     *
+     * @param  int  $projectId
+     * @param  string  $environment
+     * @return string
+     */
+    public function environmentVariables($projectId, $environment)
+    {
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
+
+        // Create SSM client
+        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+        // Build parameter path based on project and environment
+        $parameterPath = "/{$projectId}/{$environment}/variables";
+        $basePath = "/{$projectId}/{$environment}/";
+
+        try {
+            $parameters = [];
+
+            // First, try to get the specific parameter that was stored by updateEnvironmentVariables
+            try {
+                $result = $ssmClient->getParameter([
+                    'Name' => $parameterPath,
+                    'WithDecryption' => true,
+                ]);
+
+                // If we found the specific parameter, add it to parameters array
+                if (isset($result['Parameter'])) {
+                    $parameters[] = $result['Parameter'];
+                }
+            } catch (\Aws\Exception\AwsException $e) {
+                // Parameter not found at specific path, continue
+            }
+
+            // Check if variables were stored in chunks
+            $metadataPath = "/{$projectId}/{$environment}/variables_metadata";
+            try {
+                $metadataResult = $ssmClient->getParameter([
+                    'Name' => $metadataPath,
+                    'WithDecryption' => false,
+                ]);
+
+                if (isset($metadataResult['Parameter'])) {
+                    $metadata = json_decode($metadataResult['Parameter']['Value'], true);
+
+                    if ($metadata && isset($metadata['total_chunks'])) {
+                        // Retrieve all chunks
+                        for ($i = 0; $i < $metadata['total_chunks']; $i++) {
+                            $chunkPath = "/{$projectId}/{$environment}/variables_chunk_{$i}";
+
+                            try {
+                                $chunkResult = $ssmClient->getParameter([
+                                    'Name' => $chunkPath,
+                                    'WithDecryption' => true,
+                                ]);
+
+                                if (isset($chunkResult['Parameter'])) {
+                                    $parameters[] = $chunkResult['Parameter'];
+                                }
+                            } catch (\Aws\Exception\AwsException $e) {
+                                // Continue if chunk not found
+                            }
+                        }
+                    }
+                }
+            } catch (\Aws\Exception\AwsException $e) {
+                // No metadata found, continue with regular retrieval
+            }
+
+            // Also get all parameters under the base path for backward compatibility
+            try {
+                $pathBasedParameters = $this->getParametersByPath($ssmClient, $basePath);
+
+                // Merge path-based parameters with existing parameters (avoid duplicates)
+                $existingNames = array_map(function ($p) {
+                    return $p['Name'];
+                }, $parameters);
+
+                foreach ($pathBasedParameters as $pathParam) {
+                    if (!in_array($pathParam['Name'], $existingNames)) {
+                        $parameters[] = $pathParam;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Continue if path-based retrieval fails
+            }
+
+            // Convert parameters to environment variable format and concatenate
+            $envVars = [];
+            foreach ($parameters as $parameter) {
+                $name = $parameter['Name'];
+                $value = $parameter['Value'];
+
+                // Extract the parameter name from the full path
+                $paramName = basename($name);
+
+                // Skip metadata parameters
+                if ($paramName === 'variables_metadata') {
+                    continue;
+                }
+
+                // Parse the parameter value and extract key-value pairs
+                $parsedVars = $this->parseParameterValue($paramName, $value);
+                $envVars = array_merge($envVars, $parsedVars);
+            }
+
+            // Return concatenated string with newlines
+            return implode("\n", $envVars);
+
+        } catch (\Exception $e) {
+            Helpers::abort('Unable to get environment variables from parameter store. ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Parse parameter value and extract key-value pairs.
+     *
+     * @param  string  $paramName
+     * @param  string  $value
+     * @return array
+     */
+    protected function parseParameterValue($paramName, $value)
+    {
+        $envVars = [];
+
+        // Try to parse as JSON first
+        if ($this->isJson($value)) {
+            $decodedValues = json_decode($value, true);
+            if (is_array($decodedValues)) {
+                foreach ($decodedValues as $key => $val) {
+                    // Resolve SSM references in JSON values
+                    $resolvedValue = $this->resolveSsmReferences($val);
+                    $envVars[] = "{$key}={$resolvedValue}";
+                }
+
+                return $envVars;
+            }
+        }
+
+        // Try to parse as key=value pairs (multiline)
+        if (strpos($value, '=') !== false) {
+            $lines = explode("\n", $value);
+            $hasKeyValuePairs = false;
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || strpos($line, '=') === false) {
+                    continue;
+                }
+
+                $parts = explode('=', $line, 2);
+                if (count($parts) === 2) {
+                    $key = trim($parts[0]);
+                    $val = trim($parts[1]);
+                    // Resolve SSM references in values
+                    $resolvedValue = $this->resolveSsmReferences($val);
+                    $envVars[] = "{$key}={$resolvedValue}";
+                    $hasKeyValuePairs = true;
+                }
+            }
+
+            if ($hasKeyValuePairs) {
+                return $envVars;
+            }
+        }
+
+        // Try to parse as YAML-like format (key: value)
+        if (strpos($value, ':') !== false) {
+            $lines = explode("\n", $value);
+            $hasYamlPairs = false;
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || strpos($line, ':') === false) {
+                    continue;
+                }
+
+                $parts = explode(':', $line, 2);
+                if (count($parts) === 2) {
+                    $key = trim($parts[0]);
+                    $val = trim($parts[1]);
+                    // Remove quotes if present
+                    $val = trim($val, '"\'');
+                    // Resolve SSM references in values
+                    $resolvedValue = $this->resolveSsmReferences($val);
+                    $envVars[] = "{$key}={$resolvedValue}";
+                    $hasYamlPairs = true;
+                }
+            }
+
+            if ($hasYamlPairs) {
+                return $envVars;
+            }
+        }
+
+        // Try to parse as comma-separated key=value pairs
+        if (strpos($value, ',') !== false && strpos($value, '=') !== false) {
+            $pairs = explode(',', $value);
+            $hasCommaPairs = false;
+
+            foreach ($pairs as $pair) {
+                $pair = trim($pair);
+                if (strpos($pair, '=') !== false) {
+                    $parts = explode('=', $pair, 2);
+                    if (count($parts) === 2) {
+                        $key = trim($parts[0]);
+                        $val = trim($parts[1]);
+                        // Resolve SSM references in values
+                        $resolvedValue = $this->resolveSsmReferences($val);
+                        $envVars[] = "{$key}={$resolvedValue}";
+                        $hasCommaPairs = true;
+                    }
+                }
+            }
+
+            if ($hasCommaPairs) {
+                return $envVars;
+            }
+        }
+
+        // If none of the above formats match, treat as a single key=value
+        $resolvedValue = $this->resolveSsmReferences($value);
+        $envVars[] = "{$paramName}={$resolvedValue}";
+
+        return $envVars;
+    }
+
+    /**
+     * Resolve SSM parameter references in a value.
+     *
+     * @param  string  $value
+     * @return string
+     */
+    protected function resolveSsmReferences($value)
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        // Pattern to match ${ssm:/path/to/param} or ${ssm:/path/to/param:version}
+        $pattern = '/\$\{ssm:([^}]+)\}/';
+
+        return preg_replace_callback($pattern, function ($matches) {
+            $ssmPath = $matches[1];
+
+            try {
+                // Get AWS client configuration
+                $clientConfig = $this->getAwsClientConfig();
+
+                // Create SSM client
+                $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+                // Parse path and version if provided
+                $pathParts = explode(':', $ssmPath);
+                $parameterName = $pathParts[0];
+                $version = isset($pathParts[1]) ? $pathParts[1] : null;
+
+                // Prepare parameter request
+                $params = [
+                    'Name' => $parameterName,
+                    'WithDecryption' => true,
+                ];
+
+                if ($version && is_numeric($version)) {
+                    $params['ParameterValue'] = $version;
+                }
+
+                // Get the parameter value
+                $result = $ssmClient->getParameter($params);
+                $parameterValue = $result['Parameter']['Value'];
+
+                // Handle StringList parameters (comma-separated values)
+                if ($result['Parameter']['Type'] === 'StringList') {
+                    // Return as comma-separated string or process as needed
+                    return $parameterValue;
+                }
+
+                return $parameterValue;
+
+            } catch (\Exception $e) {
+                // Return the original reference if resolution fails
+                // This prevents breaking the entire configuration due to one bad reference
+                return $matches[0];
+            }
+        }, $value);
+    }
+
+    /**
+     * Check if a string is valid JSON.
+     *
+     * @param  string  $string
+     * @return bool
+     */
+    protected function isJson($string)
+    {
+        if (!is_string($string)) {
+            return false;
+        }
+
+        json_decode($string);
+
+        return json_last_error() === JSON_ERROR_NONE;
+    }
+
+    /**
+     * Get parameters from AWS Parameter Store by path.
+     *
+     * @param  \Aws\Ssm\SsmClient  $ssmClient
+     * @param  string  $path
+     * @return array
+     */
+    protected function getParametersByPath($ssmClient, $path)
+    {
+        $parameters = [];
+        $nextToken = null;
+
+        do {
+            $params = [
+                'Path' => $path,
+                'Recursive' => true,
+                'WithDecryption' => true,
+            ];
+
+            if ($nextToken) {
+                $params['NextToken'] = $nextToken;
+            }
+
+            $result = $ssmClient->getParametersByPath($params);
+            $parameters = array_merge($parameters, $result['Parameters'] ?? []);
+            $nextToken = $result['NextToken'] ?? null;
+
+        } while ($nextToken);
+
+        return $parameters;
+    }
+
+    /**
+     * Update the environment variables for the given environment.
+     *
+     * @param  int  $projectId
+     * @param  string  $environment
+     * @param  string  $variables
+     * @return array
+     */
+    public function updateEnvironmentVariables($projectId, $environment, $variables)
+    {
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
+
+        // Create SSM client
+        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+        // Build parameter path based on project and environment
+        $parameterPath = "/{$projectId}/{$environment}/variables";
+
+        try {
+            // Check if variables exceed Standard tier limit (4096 characters)
+            if (strlen($variables) <= 4096) {
+                // Use Standard tier for small parameters
+                $ssmClient->putParameter([
+                    'Name' => $parameterPath,
+                    'Value' => $variables,
+                    'Type' => 'SecureString',
+                    'Tier' => 'Standard',
+                    'Overwrite' => true,
+                    'Description' => "Environment variables for {$projectId}/{$environment}",
+                ]);
+            } else {
+                // For larger parameters, use Advanced tier (supports up to 8KB)
+                if (strlen($variables) <= 8192) {
+                    $ssmClient->putParameter([
+                        'Name' => $parameterPath,
+                        'Value' => $variables,
+                        'Type' => 'SecureString',
+                        'Tier' => 'Advanced',
+                        'Overwrite' => true,
+                        'Description' => "Environment variables for {$projectId}/{$environment} (Advanced tier)",
+                    ]);
+                } else {
+                    // For very large variable sets, split into multiple parameters
+                    $this->storeVariablesInChunks($ssmClient, $projectId, $environment, $variables);
+                }
+            }
+        } catch (\Exception $e) {
+            Helpers::abort('Unable to update environment variables in parameter store. ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Store large variable sets by splitting into multiple parameters.
+     *
+     * @param  \Aws\Ssm\SsmClient  $ssmClient
+     * @param  string  $projectId
+     * @param  string  $environment
+     * @param  string  $variables
+     * @return void
+     */
+    protected function storeVariablesInChunks($ssmClient, $projectId, $environment, $variables)
+    {
+        // Parse variables into individual key-value pairs
+        $envVars = [];
+        $lines = explode("\n", $variables);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            // Skip empty lines and comments
+            if (empty($line) || strpos($line, '#') === 0) {
+                continue;
+            }
+
+            // Parse key=value format
+            if (strpos($line, '=') !== false) {
+                $parts = explode('=', $line, 2);
+                if (count($parts) === 2) {
+                    $key = trim($parts[0]);
+                    $value = trim($parts[1]);
+
+                    if (!empty($key)) {
+                        $envVars[$key] = $value;
+                    }
+                }
+            }
+        }
+
+        // Group variables into chunks that fit within the 4KB limit
+        $chunks = [];
+        $currentChunk = [];
+        $currentSize = 0;
+        $maxChunkSize = 4000; // Leave some buffer for JSON formatting
+
+        foreach ($envVars as $key => $value) {
+            $pair = "{$key}={$value}";
+            $pairSize = strlen($pair) + 1; // +1 for newline
+
+            // If adding this pair would exceed the limit, start a new chunk
+            if ($currentSize + $pairSize > $maxChunkSize && !empty($currentChunk)) {
+                $chunks[] = $currentChunk;
+                $currentChunk = [];
+                $currentSize = 0;
+            }
+
+            $currentChunk[$key] = $value;
+            $currentSize += $pairSize;
+        }
+
+        // Add the last chunk
+        if (!empty($currentChunk)) {
+            $chunks[] = $currentChunk;
+        }
+
+        // Store each chunk as a separate parameter
+        foreach ($chunks as $index => $chunk) {
+            $chunkPath = "/{$projectId}/{$environment}/variables_chunk_{$index}";
+
+            // Convert chunk to string format
+            $chunkVariables = [];
+            foreach ($chunk as $key => $value) {
+                $chunkVariables[] = "{$key}={$value}";
+            }
+            $chunkContent = implode("\n", $chunkVariables);
+
+            $ssmClient->putParameter([
+                'Name' => $chunkPath,
+                'Value' => $chunkContent,
+                'Type' => 'SecureString',
+                'Tier' => 'Standard',
+                'Overwrite' => true,
+                'Description' => "Environment variables chunk {$index} for {$projectId}/{$environment}",
+            ]);
+        }
+
+        // Store metadata about the chunks
+        $metadataPath = "/{$projectId}/{$environment}/variables_metadata";
+        $metadata = json_encode([
+            'total_chunks' => count($chunks),
+            'chunk_pattern' => "/{$projectId}/{$environment}/variables_chunk_",
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $ssmClient->putParameter([
+            'Name' => $metadataPath,
+            'Value' => $metadata,
+            'Type' => 'String',
+            'Tier' => 'Standard',
+            'Overwrite' => true,
+            'Description' => "Metadata for chunked environment variables for {$projectId}/{$environment}",
+        ]);
+    }
+
+    /**
+     * Delete the given environment.
+     *
+     * @param  string  $projectId
+     * @param  string  $environment
+     * @return array
+     */
+    public function deleteEnvironment($projectId, $environment)
+    {
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
+
+        // Create SSM client
+        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+        try {
+            // Build parameter paths to delete
+            $parameterPaths = [
+                "/{$projectId}/{$environment}/variables",
+            ];
+
+            foreach ($parameterPaths as $path) {
+                try {
+                    // Get all parameters under this path
+                    if (substr($path, -1) === '/') {
+                        // For paths ending with /, get all parameters recursively
+                        $parameters = $this->getParametersByPath($ssmClient, $path);
+
+                        foreach ($parameters as $parameter) {
+                            try {
+                                $ssmClient->deleteParameter([
+                                    'Name' => $parameter['Name'],
+                                ]);
+                            } catch (\Aws\Exception\AwsException $e) {
+                                Helpers::abort("Failed to delete {$parameter['Name']}: " . $e->getMessage());
+                            }
+                        }
+                    } else {
+                        // For specific parameter paths
+                        try {
+                            $ssmClient->deleteParameter([
+                                'Name' => $path,
+                            ]);
+                        } catch (\Aws\Exception\AwsException $e) {
+                            // Parameter might not exist, which is okay
+                            if ($e->getAwsErrorCode() !== 'ParameterNotFound') {
+                                Helpers::abort("Failed to delete {$path}: " . $e->getMessage());
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Helpers::abort("Error processing path {$path}: " . $e->getMessage());
+                }
+            }
+        } catch (\Exception $e) {
+            Helpers::abort('Failed to delete environment. ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get all of the secrets for the given environment.
+     *
+     * @param  string  $projectId
+     * @param  string  $environment
+     * @return array
+     */
+    public function secrets($projectId, $environment)
+    {
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
+
+        // Create SSM client
+        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+        // Build secrets path based on project and environment
+        $secretsPath = "/{$projectId}/{$environment}/secrets/";
+
+        try {
+            // Get all secret parameters under the secrets path
+            $parameters = $this->getParametersByPath($ssmClient, $secretsPath);
+
+            $secrets = [];
+            foreach ($parameters as $parameter) {
+                $name = $parameter['Name'];
+                $value = $parameter['Value'];
+
+                // Extract the secret name from the full path
+                $secretName = basename($name);
+
+                $secrets[] = [
+                    'id' => $name, // Use full path as ID for deletion
+                    'name' => $secretName,
+                    'value' => $value,
+                    'type' => $parameter['Type'],
+                    'created_at' => $parameter['LastModifiedDate'] ?? null,
+                    'updated_at' => $parameter['LastModifiedDate'] ?? null,
+                ];
+            }
+
+            return $secrets;
+
+        } catch (\Exception $e) {
+            Helpers::abort('Unable to get secrets from parameter store. ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Store a secret for the given environment.
+     *
+     * @param  string  $projectId
+     * @param  string  $environment
+     * @param  string  $name
+     * @param  string  $value
+     * @return array
+     */
+    public function storeSecret($projectId, $environment, $name, $value)
+    {
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
+
+        // Create SSM client
+        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+        // Build secret parameter path
+        $secretPath = "/{$projectId}/{$environment}/secrets/{$name}";
+
+        try {
+            // Determine parameter tier based on value size
+            $tier = 'Standard';
+            $type = 'SecureString';
+
+            if (strlen($value) > 4096) {
+                if (strlen($value) <= 8192) {
+                    $tier = 'Advanced';
+                } else {
+                    Helpers::abort('Secret value too large. Maximum size is 8KB for secrets.');
+                }
+            }
+
+            // Store the secret
+            $ssmClient->putParameter([
+                'Name' => $secretPath,
+                'Value' => $value,
+                'Type' => $type,
+                'Tier' => $tier,
+                'Overwrite' => true,
+                'Description' => "Secret '{$name}' for {$projectId}/{$environment}",
+            ]);
+        } catch (\Exception $e) {
+            Helpers::abort('Unable to store secret in parameter store. ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete the given secret.
+     *
+     * @param  string  $secretId
+     * @return void
+     */
+    public function deleteSecret($secretId)
+    {
+        // Get AWS client configuration
+        $clientConfig = $this->getAwsClientConfig();
+
+        // Create SSM client
+        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+
+        try {
+            // Delete the secret parameter
+            $ssmClient->deleteParameter([
+                'Name' => $secretId, // secretId is the full parameter path
+            ]);
+
+        } catch (\Aws\Exception\AwsException $e) {
+            if ($e->getAwsErrorCode() !== 'ParameterNotFound') {
+                Helpers::abort('Unable to delete secret from parameter store. ' . $e->getMessage());
+            }
+            // If parameter not found, consider it already deleted (success)
+        } catch (\Exception $e) {
+            Helpers::abort('Unable to delete secret from parameter store. ' . $e->getMessage());
+        }
     }
 }
