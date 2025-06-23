@@ -16,6 +16,18 @@ class PushCommand extends VaporBuildCommand
     use ExecuteTrait;
 
     /**
+     * Configure the command options.
+     */
+    protected function configure()
+    {
+        $this
+            ->setName('sls:push')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
+            ->addArgument('args', InputArgument::OPTIONAL, 'Extra arguments for sls')
+            ->setDescription('Deploy the Serverless file');
+    }
+
+    /**
      * Execute the command.
      */
     public function handle()
@@ -30,16 +42,5 @@ class PushCommand extends VaporBuildCommand
 
         Helpers::line();
         Helpers::line('<info>Project deployed successfully.</info> (' . $time . ')');
-    }
-
-    /**
-     * Configure the command options.
-     */
-    protected function configure()
-    {
-        $this
-            ->setName('push')
-            ->addArgument('args', InputArgument::OPTIONAL, 'Extra arguments for sls')
-            ->setDescription('Deploy the Serverless file');
     }
 }

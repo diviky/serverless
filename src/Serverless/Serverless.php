@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Diviky\Serverless\Serverless;
 
 use Diviky\Serverless\Concerns\EnvReader;
+use Diviky\Serverless\Manifest;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\VaporCli\Helpers;
-use Laravel\VaporCli\Manifest;
 use Laravel\VaporCli\Path;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
@@ -26,14 +26,17 @@ class Serverless
     {
         $manifest = Manifest::current();
 
+        $provider = $manifest['provider'] ?? [];
+
         $env = $manifest['environments'][$stage];
-        $region = $manifest['region'] ?? 'ap-south-1';
+        $region = $provider['region'] ?? 'ap-south-1';
         $name = $manifest['name'];
         $runtime = $env['runtime'];
-        $image = $manifest['name'];
+        $image = $manifest['service'] ?? $manifest['name'];
+
         $layers = null;
         $uuid = \date('ymdhm');
-        $account_id = $manifest['id'];
+        $account_id = $provider['accountId'] ?? $manifest['id'];
 
         $queue_name = $stage . '_default';
         $queues = $env['queues'] ?? false;
@@ -73,7 +76,7 @@ class Serverless
         }
 
         $environment = \array_merge([
-            'VAPOR_SSM_PATH' => $env['ssm'] ?? '/' . $yaml['org'] . '/' . $stage . '/' . $name,
+            'VAPOR_SSM_PATH' => $env['ssm'] ?? '/' . $manifest['id'] . '/' . $stage . '/' . $name,
             'VAPOR_SSM_VARIABLES' => '[]',
             'VAPOR_SERVERLESS_DB' => 'false',
             'VAPOR_MAINTENANCE_MODE' => 'false',
@@ -83,9 +86,13 @@ class Serverless
             'LOG_CHANNEL' => 'stderr',
             'LOG_STDERR_FORMATTER' => 'Laravel\Vapor\Logging\JsonFormatter',
             'APP_CONFIG_CACHE' => '/tmp/storage/bootstrap/cache/config.php',
+            'APP_ROUTES_CACHE' => '/tmp/storage/bootstrap/cache/routes-v7.php',
+            'APP_EVENTS_CACHE' => '/tmp/storage/bootstrap/cache/events.php',
+            'APP_PACKAGES_CACHE' => '/tmp/storage/bootstrap/cache/packages.php',
             'LD_LIBRARY_PATH' => '/opt/lib:/opt/lib/bref:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib',
             'PATH' => '/opt/bin:/usr/local/bin:/usr/bin/:/bin',
             'XDG_CONFIG_HOME' => '/tmp',
+            'LARAVEL_STORAGE_PATH' => '/tmp/storage',
             'APP_VANITY_URL' => '',
         ], $secrets);
 
@@ -110,7 +117,7 @@ class Serverless
         $bucket = null;
         $bucket_prefix = null;
         if (isset($env['assets']) && $env['assets'] !== false) {
-            $bucket = \is_string($env['assets']) ? $env['assets'] : 'com.${self:org}.${self:provider.region}.assets';
+            $bucket = Manifest::bucket($stage);
             $bucket_prefix = $stage . '/' . $uuid;
 
             if (isset($env['asset-domain']) && is_string($env['asset-domain'])) {
@@ -126,18 +133,18 @@ class Serverless
         $environment = \array_merge($environment, self::envVarsToArray($env['environment'] ?? null));
 
         $yaml['provider'] = \array_filter([
-            'name' => 'aws',
-            'region' => $region,
+            'name' => $provider['name'] ?? 'aws',
+            'region' => $provider['region'] ?? $region,
             'stage' => $stage,
-            'profile' => $manifest['profile'] ?? null,
+            'profile' => $provider['profile'] ?? null,
             'runtime' => 'provided.al2',
-            'architecture' => $manifest['architecture'] ?? ($runtime == 'docker-arm' ? 'arm64' : null),
+            'architecture' => $provider['architecture'] ?? ($runtime == 'docker-arm' ? 'arm64' : null),
             'environment' => $environment,
             'apiGateway' => [
                 'shouldStartNameWithService' => true,
             ],
             'deploymentBucket' => [
-                'name' => $env['deployment-bucket'] ?? 'com.${self:org}.${self:provider.region}.deploys',
+                'name' => Manifest::deploymentBucket($stage),
                 'maxPreviousDeploymentArtifacts' => 10,
                 'blockPublicAccess' => true,
             ],

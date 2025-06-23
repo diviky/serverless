@@ -16,7 +16,7 @@ class SlsCommand extends VaporDeployCommand
     protected function configure()
     {
         $this
-            ->setName('sls')
+            ->setName('sls:deploy')
             ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name')
             ->addOption('commit', null, InputOption::VALUE_OPTIONAL, 'The commit hash that is being deployed')
             ->addOption('message', null, InputOption::VALUE_OPTIONAL, 'The message for the commit that is being deployed')

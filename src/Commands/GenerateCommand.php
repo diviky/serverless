@@ -13,6 +13,17 @@ class GenerateCommand extends VaporBuildCommand
     use ExecuteTrait;
 
     /**
+     * Configure the command options.
+     */
+    protected function configure()
+    {
+        $this
+            ->setName('sls:generate')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
+            ->setDescription('Create Serverless file');
+    }
+
+    /**
      * Execute the command.
      */
     public function handle()
@@ -21,16 +32,5 @@ class GenerateCommand extends VaporBuildCommand
 
         Helpers::line();
         Helpers::line('<info>Serverless file created successfully.</info>');
-    }
-
-    /**
-     * Configure the command options.
-     */
-    protected function configure()
-    {
-        $this
-            ->setName('generate')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
-            ->setDescription('Create Serverless file');
     }
 }

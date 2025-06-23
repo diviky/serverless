@@ -32,17 +32,33 @@ class Manifest extends \Laravel\VaporCli\Manifest
 
     public static function bucket($environment)
     {
-        $region = static::current()['region'] ?? 'us-east-1';
+        $region = static::provider()['region'] ?? 'us-east-1';
         $id = static::current()['id'] ?? time();
+        $assets = static::environment($environment)['assets'] ?? null;
 
-        return static::environment($environment)['assets'] ?? "vapor-{$region}-assets-{$id}";
+        return isset($assets) && is_string($assets) ? $assets : "vapor-{$region}-assets-{$id}";
+    }
+
+    public static function deploymentBucket($environment)
+    {
+        $region = static::provider()['region'] ?? 'us-east-1';
+        $id = static::current()['id'] ?? time();
+        $deploymentBucket = static::environment($environment)['deployment-bucket'] ?? null;
+
+        return isset($deploymentBucket) && is_string($deploymentBucket) ? $deploymentBucket : "vapor-{$region}-deployment-{$id}";
     }
 
     public static function artifactBucket($environment)
     {
-        $region = static::current()['region'] ?? 'us-east-1';
+        $region = static::provider()['region'] ?? 'us-east-1';
         $id = static::current()['id'] ?? time();
+        $artifacts = static::environment($environment)['artifact-bucket'] ?? null;
 
-        return static::environment($environment)['artifact-bucket'] ?? "vapor-{$region}-artifacts-{$id}";
+        return isset($artifacts) && is_string($artifacts) ? $artifacts : "vapor-{$region}-artifacts-{$id}";
+    }
+
+    public static function provider()
+    {
+        return static::current()['provider'] ?? [];
     }
 }
