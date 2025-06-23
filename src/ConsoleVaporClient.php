@@ -113,6 +113,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         // Get AWS profile and region from serverless.yml or environment
         $repositoryName = Manifest::image($environment);
         $bucketName = Manifest::artifactBucket($environment);
+        $assetsBucketName = Manifest::bucket($environment);
+
         $artifactKey = 'releases/' . $uuid . '/';
 
         // Generate ECR details using AWS profile
@@ -139,8 +141,10 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'container_image_tag' => $ecrDetails['image_tag'],
             'url' => $artifact_url,
             'uses_container_image' => is_null($file),
-            'bucket' => $bucketName,
+            'artifact_bucket' => $bucketName,
             'path' => $artifactKey,
+            'assets_bucket' => $assetsBucketName,
+            'environment' => $environment,
         ];
 
         if ($file) {
@@ -175,23 +179,6 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         // Check if profile exists, fallback to default if not
         $envProfile = env('AWS_PROFILE', $profile);
 
-        // Try to verify profile exists by checking AWS config
-        if ($envProfile !== 'default') {
-            try {
-                // Simple check - if profile exists, this won't throw an error
-                $configPath = $_SERVER['HOME'] . '/.aws/config';
-                if (file_exists($configPath)) {
-                    $config = file_get_contents($configPath);
-                    if (strpos($config, "[profile {$envProfile}]") === false) {
-                        // Profile doesn't exist, use default
-                        $envProfile = 'default';
-                    }
-                }
-            } catch (\Exception $e) {
-                $envProfile = 'default';
-            }
-        }
-
         return $envProfile;
     }
 
@@ -204,6 +191,9 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     {
         try {
             $manifest = Manifest::current();
+            if (isset($manifest['aws']['region'])) {
+                return $manifest['aws']['region'];
+            }
             if (isset($manifest['region'])) {
                 return $manifest['region'];
             }
@@ -212,6 +202,33 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         }
 
         return env('AWS_REGION', 'us-east-1');
+    }
+
+    /**
+     * Get AWS credentials from manifest or environment.
+     *
+     * @return array
+     */
+    protected function getAwsCredentials()
+    {
+        try {
+            $manifest = Manifest::current();
+            if (isset($manifest['aws'])) {
+                return [
+                    'key' => $manifest['aws']['access_key'] ?? env('AWS_ACCESS_KEY_ID'),
+                    'secret' => $manifest['aws']['secret_key'] ?? env('AWS_SECRET_ACCESS_KEY'),
+                    'region' => $manifest['aws']['region'] ?? $this->getAwsRegion(),
+                ];
+            }
+        } catch (\Exception $e) {
+            // Fallback if manifest reading fails
+        }
+
+        return [
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => $this->getAwsRegion(),
+        ];
     }
 
     /**
@@ -225,72 +242,66 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function generateEcrDetails($repositoryName, $tag = 'latest')
     {
+        $credentials = $this->getAwsCredentials();
         $profile = $this->getAwsProfile();
-        $region = $this->getAwsRegion();
 
         $tag = $tag ?? 'latest';
         $repositoryName = strtolower($repositoryName);
 
-        try {
-            // Configure AWS clients with fallback to default profile
-            $clientConfig = [
-                'region' => $region,
-                'version' => 'latest',
+        // Configure AWS clients with credentials or profile
+        $clientConfig = [
+            'region' => $credentials['region'],
+            'version' => 'latest',
+        ];
+
+        if (!empty($credentials['key']) && !empty($credentials['secret'])) {
+            $clientConfig['credentials'] = [
+                'key' => $credentials['key'],
+                'secret' => $credentials['secret'],
             ];
-
-            // Only add profile if it's not default and profile exists
-            if ($profile !== 'default') {
-                $clientConfig['profile'] = $profile;
-            }
-
-            // Create STS client to get account ID
-            $stsClient = new \Aws\Sts\StsClient($clientConfig);
-
-            // Get AWS Account ID
-            $identity = $stsClient->getCallerIdentity();
-            $accountId = $identity['Account'];
-
-            if (empty($accountId)) {
-                throw new \Exception('Unable to get AWS Account ID');
-            }
-
-            // Repository name based on project
-            $repositoryUri = "{$accountId}.dkr.ecr.{$region}.amazonaws.com/{$repositoryName}";
-
-            // Create ECR client
-            $ecrClient = new \Aws\Ecr\EcrClient($clientConfig);
-
-            // Create ECR repository if it doesn't exist
-            try {
-                $ecrClient->createRepository([
-                    'repositoryName' => $repositoryName,
-                ]);
-            } catch (\Aws\Exception\AwsException $e) {
-                // Repository might already exist, ignore error
-            }
-
-            // Get ECR authorization token
-            $authResult = $ecrClient->getAuthorizationToken();
-            $authData = $authResult['authorizationData'][0] ?? null;
-
-            if (!$authData || empty($authData['authorizationToken'])) {
-                throw new \Exception('Unable to get ECR authorization token');
-            }
-
-            return [
-                'registry_token' => $authData['authorizationToken'],
-                'repository_uri' => $repositoryUri,
-                'image_tag' => $tag,
-            ];
-
-        } catch (\Exception $e) {
-            // Fallback values if AWS SDK fails
-            return [
-                'registry_token' => base64_encode("AWS:{$tag}"),
-                'repository_uri' => "123456789012.dkr.ecr.{$region}.amazonaws.com/{$repositoryName}",
-                'image_tag' => $tag,
-            ];
+        } elseif ($profile !== 'default') {
+            $clientConfig['profile'] = $profile;
         }
+
+        // Create STS client to get account ID
+        $stsClient = new \Aws\Sts\StsClient($clientConfig);
+
+        // Get AWS Account ID
+        $identity = $stsClient->getCallerIdentity();
+        $accountId = $identity['Account'];
+
+        if (empty($accountId)) {
+            throw new \Exception('Unable to get AWS Account ID');
+        }
+
+        // Repository name based on project
+        $repositoryUri = "{$accountId}.dkr.ecr.{$credentials['region']}.amazonaws.com/{$repositoryName}";
+
+        // Create ECR client
+        $ecrClient = new \Aws\Ecr\EcrClient($clientConfig);
+
+        // Create ECR repository if it doesn't exist
+        try {
+            $ecrClient->createRepository([
+                'repositoryName' => $repositoryName,
+            ]);
+        } catch (\Aws\Exception\AwsException $e) {
+            // Repository might already exist, ignore error
+        }
+
+        // Get ECR authorization token
+        $authResult = $ecrClient->getAuthorizationToken();
+        $authData = $authResult['authorizationData'][0] ?? null;
+
+        if (!$authData || empty($authData['authorizationToken'])) {
+            throw new \Exception('Unable to get ECR authorization token');
+        }
+
+        return [
+            'registry_token' => $authData['authorizationToken'],
+            'repository_uri' => $repositoryUri,
+            'image_tag' => $tag,
+        ];
     }
 
     /**
@@ -305,18 +316,22 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function generateS3PresignedUrls($bucketName, $artifactKey)
     {
+        $credentials = $this->getAwsCredentials();
         $profile = $this->getAwsProfile();
-        $region = $this->getAwsRegion();
 
         try {
-            // Configure AWS clients with fallback to default profile
+            // Configure AWS clients with credentials or profile
             $clientConfig = [
-                'region' => $region,
+                'region' => $credentials['region'],
                 'version' => 'latest',
             ];
 
-            // Only add profile if it's not default
-            if ($profile !== 'default') {
+            if (!empty($credentials['key']) && !empty($credentials['secret'])) {
+                $clientConfig['credentials'] = [
+                    'key' => $credentials['key'],
+                    'secret' => $credentials['secret'],
+                ];
+            } elseif ($profile !== 'default') {
                 $clientConfig['profile'] = $profile;
             }
 
@@ -332,7 +347,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                     $s3Client->createBucket([
                         'Bucket' => $bucketName,
                         'CreateBucketConfiguration' => [
-                            'LocationConstraint' => $region !== 'us-east-1' ? $region : null,
+                            'LocationConstraint' => $credentials['region'] !== 'us-east-1' ? $credentials['region'] : null,
                         ],
                     ]);
                 } catch (\Aws\Exception\AwsException $createException) {
@@ -358,15 +373,33 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Get authorized URLs to store the given artifact assets.
      *
-     * @param  int  $artifactId
+     * @param  array  $artifact
      * @return array
      */
-    public function authorizeArtifactAssets($artifactId, array $files, bool $fresh = false)
+    public function authorizeArtifactAssets($artifact, array $files, bool $fresh = false)
     {
         return [
-            'store' => $files,
+            'store' => $this->createSignedAssets($artifact, $files),
             'copy' => [],
         ];
+    }
+
+    protected function createSignedAssets(array $artifact, array $files)
+    {
+        $bucketName = $artifact['assets_bucket'];
+
+        $response = [];
+        foreach ($files as $file) {
+            $response[] = [
+                'url' => $this->generateS3PresignedUrls($bucketName, $file['path']),
+                'path' => $file['path'],
+                'headers' => [
+                    'Cache-Control' => 'public, max-age=31536000',
+                ],
+            ];
+        }
+
+        return $response;
     }
 
     public function deploy($artifactId, array $manifest, $debugMode)
