@@ -12,7 +12,7 @@ class Manifest extends \Laravel\VaporCli\Manifest
             return $config['separate-assets'] ? true : false;
         }
 
-        return $config['assets'] ? true : false;
+        return isset($config['assets']) && $config['assets'] ? true : false;
     }
 
     /**
@@ -27,7 +27,7 @@ class Manifest extends \Laravel\VaporCli\Manifest
 
     public static function image($environment)
     {
-        return static::environment($environment)['image'] ?? static::name();
+        return static::environment($environment)['image'] ?? static::name().'-'.$environment;
     }
 
     public static function bucket($environment)

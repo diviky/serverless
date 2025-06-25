@@ -30,18 +30,13 @@ class SlsCommand extends VaporDeployCommand
 
     protected function uploadArtifact($environment, $uuid)
     {
+        $artifact = parent::uploadArtifact($environment, $uuid);
+
         Helpers::line();
 
         Serverless::generate($environment);
         Serverless::deploy();
 
-        return [];
+        return $artifact;
     }
-
-    /**
-     * Serve the artifact's assets at the given path.
-     *
-     * @return void
-     */
-    protected function serveAssets(array $artifact) {}
 }

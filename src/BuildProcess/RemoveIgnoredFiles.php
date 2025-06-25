@@ -56,8 +56,6 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
                     $this->files->delete($fullPath);
                 }
             } else {
-                Helpers::step('<comment>Path does not exist:</comment> ' . $fullPath);
-
                 // Check if it's a relative path issue - try without leading slash
                 $alternativePath = $appPath . '/' . ltrim($pattern, '/');
                 if ($alternativePath !== $fullPath && $this->files->exists($alternativePath)) {
@@ -191,10 +189,7 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
             } catch (\Exception $e) {
                 // Skip if directory structure changes during iteration
                 Helpers::step('<comment>Skipping pattern due to directory changes:</comment> ' . $directory . '/' . $filePattern);
-                Helpers::step('<comment>Error:</comment> ' . $e->getMessage());
             }
-        } else {
-            Helpers::step('<comment>Directory does not exist:</comment> ' . $fullDirectory);
         }
     }
 }
