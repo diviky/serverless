@@ -61,4 +61,9 @@ class Manifest extends \Laravel\VaporCli\Manifest
     {
         return static::current()['provider'] ?? [];
     }
+
+    public static function shouldPackageApplication($environment)
+    {
+        return static::environment($environment)['package'] ?? false;
+    }
 }

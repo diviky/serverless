@@ -7,13 +7,14 @@ use Diviky\Serverless\BuildProcess\BuildContainerImage;
 use Diviky\Serverless\BuildProcess\CollectSecrets;
 use Diviky\Serverless\BuildProcess\CompressApplication;
 use Diviky\Serverless\BuildProcess\CopyApplicationToBuildPath;
+use Diviky\Serverless\BuildProcess\ExecuteBuildCommands;
 use Diviky\Serverless\BuildProcess\ExtractAssetsToSeparateDirectory;
+use Diviky\Serverless\BuildProcess\PackageApplication;
 use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
 use Diviky\Serverless\Concerns\ExecuteTrait;
 use Laravel\VaporCli\BuildProcess\CompressVendor;
 use Laravel\VaporCli\BuildProcess\ConfigureArtisan;
 use Laravel\VaporCli\BuildProcess\ConfigureComposerAutoloader;
-use Laravel\VaporCli\BuildProcess\ExecuteBuildCommands;
 use Laravel\VaporCli\BuildProcess\ExtractVendorToSeparateDirectory;
 use Laravel\VaporCli\BuildProcess\HarmonizeConfigurationFiles;
 use Laravel\VaporCli\BuildProcess\InjectErrorPages;
@@ -71,6 +72,7 @@ class BuildCommand extends VaporBuildCommand
             new ExtractVendorToSeparateDirectory($this->argument('environment')),
             new CompressApplication($this->argument('environment')),
             new CompressVendor($this->argument('environment')),
+            new PackageApplication($this->argument('environment')),
             new BuildContainerImage(
                 $this->argument('environment'),
                 $this->option('build-arg'),
