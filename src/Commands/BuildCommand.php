@@ -13,7 +13,8 @@ use Diviky\Serverless\BuildProcess\PackageApplication;
 use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
 use Diviky\Serverless\Concerns\ExecuteTrait;
 use Laravel\VaporCli\BuildProcess\CompressVendor;
-use Laravel\VaporCli\BuildProcess\ConfigureArtisan;
+use Diviky\Serverless\BuildProcess\ConfigureArtisan;
+use Diviky\Serverless\BuildProcess\ConfigureIndex;
 use Laravel\VaporCli\BuildProcess\ConfigureComposerAutoloader;
 use Laravel\VaporCli\BuildProcess\ExtractVendorToSeparateDirectory;
 use Laravel\VaporCli\BuildProcess\HarmonizeConfigurationFiles;
@@ -59,6 +60,7 @@ class BuildCommand extends VaporBuildCommand
             new ExecuteBuildCommands($this->argument('environment')),
             new ValidateOctaneDependencies($this->argument('environment')),
             new ConfigureArtisan($this->argument('environment')),
+            new ConfigureIndex($this->argument('environment')),
             new ConfigureComposerAutoloader($this->argument('environment')),
             new RemoveIgnoredFiles,
             new RemovePintBinary,

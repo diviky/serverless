@@ -47,6 +47,14 @@ environments:
     queues: false
     octane: true
     cloudfront: false
+    package:
+      phar: false
+      obfuscate:
+        enabled: false
+        directories:
+          - "app"
+          - "bootstrap"
+          - "vendor/diviky/support"
     volumes:
       - /mnt/storage:fsap-0a31095162dd0ca44
     subnets:

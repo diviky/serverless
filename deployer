@@ -87,4 +87,7 @@ $app->add(new Commands\EnvPullCommand);
 $app->add(new Commands\EnvPushCommand);
 $app->add(new Commands\EnvDeleteCommand);
 
+// Package...
+$app->add(new Commands\PackageCommand);
+
 $app->run();
