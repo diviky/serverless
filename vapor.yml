@@ -19,7 +19,8 @@ ignore:
   - tests
   - "*.dat"
   - "*.mmdb"
-  - vendor/*.js
+  - "*.log"
+  - "vendor/**/.git"
   - vendor/pragmarx/support/src/GeoIp/GeoLiteCity.dat
   - vendor/pragmarx/support/src/GeoIp/GeoLite2-City.mmdb
   - .env.docker

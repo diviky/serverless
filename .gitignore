@@ -9,3 +9,4 @@ seed.php
 vapor.phar
 .phpunit.result.cache
 .DS_Store
+/.phpunit.cache
