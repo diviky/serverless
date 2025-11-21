@@ -3,6 +3,7 @@
 namespace Diviky\Serverless;
 
 use GuzzleHttp\Exception\ClientException;
+use Illuminate\Support\Str;
 use Laravel\VaporCli\Aws\AwsStorageProvider;
 use Laravel\VaporCli\ConsoleVaporClient as VaporConsoleVaporClient;
 use Laravel\VaporCli\Helpers;
@@ -32,6 +33,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     {
         return [
             'cloudfront_status' => '',
+            'id' => $projectId,
+            'uuid' => (string) Str::uuid(),
             'asset_domains' => [
                 's3' => 'https://s3.com/',
             ],

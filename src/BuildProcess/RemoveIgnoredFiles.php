@@ -13,27 +13,114 @@ use Symfony\Component\Finder\Finder;
 class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
 {
     /**
+     * Negation patterns (patterns starting with !).
+     *
+     * @var array
+     */
+    protected $negationPatterns = [];
+
+    /**
      * Remove the user ignored files specified in the project manifest.
      */
     protected function removeUserIgnoredFiles(): void
     {
         $appPath = Path::app();
-        Helpers::step('<comment>Build directory:</comment> '.$appPath);
+        Helpers::step('<comment>Build directory:</comment> ' . $appPath);
 
         // Show what actually exists in the build directory
         if ($this->files->isDirectory($appPath)) {
             $items = $this->files->directories($appPath);
-            Helpers::step('<comment>Directories in build:</comment> '.implode(', ', array_map('basename', $items)));
+            Helpers::step('<comment>Directories in build:</comment> ' . implode(', ', array_map('basename', $items)));
 
             $files = $this->files->files($appPath);
             if (count($files) > 0) {
-                Helpers::step('<comment>Files in build root:</comment> '.implode(', ', array_map('basename', array_slice($files, 0, 10))));
+                Helpers::step('<comment>Files in build root:</comment> ' . implode(', ', array_map('basename', array_slice($files, 0, 10))));
             }
         }
 
+        // Separate ignore patterns from negation patterns
+        $ignorePatterns = [];
+        $this->negationPatterns = [];
+
         foreach (Manifest::ignoredFiles() as $pattern) {
+            // Remove quotes if present
+            $pattern = trim($pattern, '"\'');
+
+            if (strpos($pattern, '!') === 0) {
+                // This is a negation pattern - remove the ! prefix
+                $this->negationPatterns[] = substr($pattern, 1);
+            } else {
+                // This is a regular ignore pattern
+                $ignorePatterns[] = $pattern;
+            }
+        }
+
+        // Process ignore patterns (negation patterns will be checked during removal)
+        foreach ($ignorePatterns as $pattern) {
             $this->removePattern($pattern);
         }
+    }
+
+    /**
+     * Check if a path matches any negation pattern.
+     *
+     * @param  string  $relativePath  Path relative to app directory
+     */
+    protected function matchesNegationPattern(string $relativePath): bool
+    {
+        foreach ($this->negationPatterns as $negationPattern) {
+            if ($this->pathMatchesPattern($relativePath, $negationPattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a path matches a pattern (supports wildcards and recursive patterns).
+     */
+    protected function pathMatchesPattern(string $path, string $pattern): bool
+    {
+        // Normalize paths
+        $path = str_replace('\\', '/', trim($path, '/'));
+        $pattern = str_replace('\\', '/', trim($pattern, '/"'));
+
+        // Exact match
+        if ($path === $pattern) {
+            return true;
+        }
+
+        // Handle recursive patterns like vendor/**/docs
+        if (strpos($pattern, '**') !== false) {
+            // Convert ** to regex that matches any number of directories
+            $patternRegex = preg_quote($pattern, '/');
+            // Replace **/ with pattern that matches zero or more directories
+            $patternRegex = str_replace('\*\*\/', '([^\/]+\/)*', $patternRegex);
+            // Replace standalone ** with pattern that matches anything
+            $patternRegex = str_replace('\*\*', '.*', $patternRegex);
+            // Replace single * with pattern that matches non-slash characters
+            $patternRegex = str_replace('\*', '[^\/]*', $patternRegex);
+            $patternRegex = '/^' . str_replace('/', '\/', $patternRegex) . '$/';
+
+            return (bool) preg_match($patternRegex, $path);
+        }
+
+        // Handle simple wildcard patterns
+        if (strpos($pattern, '*') !== false) {
+            $patternRegex = preg_quote($pattern, '/');
+            $patternRegex = str_replace('\*', '[^\/]*', $patternRegex);
+            $patternRegex = '/^' . str_replace('/', '\/', $patternRegex) . '$/';
+
+            return (bool) preg_match($patternRegex, $path);
+        }
+
+        // Simple prefix match for directories (handles both exact and subdirectory matches)
+        if ($path === $pattern || strpos($path, $pattern . '/') === 0) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -45,25 +132,43 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
 
         // Handle direct paths (like .git, .github)
         if (strpos($pattern, '*') === false) {
-            $fullPath = $appPath.'/'.$pattern;
+            $fullPath = $appPath . '/' . $pattern;
 
             if ($this->files->exists($fullPath)) {
+                $relativePath = $pattern;
+
+                // Check if this path matches a negation pattern
+                if ($this->matchesNegationPattern($relativePath)) {
+                    Helpers::step('<comment>Skipping (negated):</comment> ' . $pattern);
+
+                    return;
+                }
+
                 if ($this->files->isDirectory($fullPath)) {
-                    Helpers::step('<comment>Removing Ignored Directory:</comment> '.$pattern.'/');
+                    Helpers::step('<comment>Removing Ignored Directory:</comment> ' . $pattern . '/');
                     $this->files->deleteDirectory($fullPath, false);
                 } else {
-                    Helpers::step('<comment>Removing Ignored File:</comment> '.$pattern);
+                    Helpers::step('<comment>Removing Ignored File:</comment> ' . $pattern);
                     $this->files->delete($fullPath);
                 }
             } else {
                 // Check if it's a relative path issue - try without leading slash
-                $alternativePath = $appPath.'/'.ltrim($pattern, '/');
+                $alternativePath = $appPath . '/' . ltrim($pattern, '/');
                 if ($alternativePath !== $fullPath && $this->files->exists($alternativePath)) {
+                    $relativePath = ltrim($pattern, '/');
+
+                    // Check if this path matches a negation pattern
+                    if ($this->matchesNegationPattern($relativePath)) {
+                        Helpers::step('<comment>Skipping (negated):</comment> ' . $pattern);
+
+                        return;
+                    }
+
                     if ($this->files->isDirectory($alternativePath)) {
-                        Helpers::step('<comment>Removing Ignored Directory (alternative path):</comment> '.$pattern.'/');
+                        Helpers::step('<comment>Removing Ignored Directory (alternative path):</comment> ' . $pattern . '/');
                         $this->files->deleteDirectory($alternativePath, false);
                     } else {
-                        Helpers::step('<comment>Removing Ignored File (alternative path):</comment> '.$pattern);
+                        Helpers::step('<comment>Removing Ignored File (alternative path):</comment> ' . $pattern);
                         $this->files->delete($alternativePath);
                     }
                 }
@@ -90,7 +195,7 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
     {
         $appPath = Path::app();
 
-        Helpers::step('<comment>Processing recursive pattern:</comment> '.$pattern);
+        Helpers::step('<comment>Processing recursive pattern:</comment> ' . $pattern);
 
         // For patterns like vendor/**/.git, we want to find all '.git' directories
         // inside the main 'vendor' directory at any depth
@@ -98,9 +203,9 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
             $basePath = $matches[1];
             $targetName = $matches[2];
 
-            $searchPath = $appPath.'/'.$basePath;
+            $searchPath = $appPath . '/' . $basePath;
 
-            Helpers::step('<comment>Searching in:</comment> '.$searchPath.' <comment>for:</comment> '.$targetName);
+            Helpers::step('<comment>Searching in:</comment> ' . $searchPath . ' <comment>for:</comment> ' . $targetName);
 
             if ($this->files->isDirectory($searchPath)) {
                 try {
@@ -117,30 +222,38 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
                         $pathsToDelete[] = $directory->getRealPath();
                     }
 
-                    Helpers::step('<comment>Found '.count($pathsToDelete).' directories matching:</comment> '.$targetName);
+                    Helpers::step('<comment>Found ' . count($pathsToDelete) . ' directories matching:</comment> ' . $targetName);
 
                     // Sort paths by depth (deepest first) to avoid deletion conflicts
                     usort($pathsToDelete, function ($a, $b) {
                         return substr_count($b, '/') - substr_count($a, '/');
                     });
 
-                    // Now delete them, checking existence first
+                    // Now delete them, checking existence first and negation patterns
                     foreach ($pathsToDelete as $path) {
                         if ($this->files->exists($path) && $this->files->isDirectory($path)) {
-                            $relativePath = str_replace($appPath.'/', '', $path);
-                            Helpers::step('<comment>Removing Ignored Directory:</comment> '.$relativePath.'/');
+                            $relativePath = str_replace($appPath . '/', '', $path);
+
+                            // Check if this path matches a negation pattern
+                            if ($this->matchesNegationPattern($relativePath)) {
+                                Helpers::step('<comment>Skipping (negated):</comment> ' . $relativePath . '/');
+
+                                continue;
+                            }
+
+                            Helpers::step('<comment>Removing Ignored Directory:</comment> ' . $relativePath . '/');
                             $this->files->deleteDirectory($path, false);
                         }
                     }
                 } catch (\Exception $e) {
                     // Skip if directory structure changes during iteration
-                    Helpers::step('<comment>Skipping pattern due to directory changes:</comment> '.$pattern.' ('.$e->getMessage().')');
+                    Helpers::step('<comment>Skipping pattern due to directory changes:</comment> ' . $pattern . ' (' . $e->getMessage() . ')');
                 }
             } else {
-                Helpers::step('<comment>Base directory does not exist:</comment> '.$searchPath);
+                Helpers::step('<comment>Base directory does not exist:</comment> ' . $searchPath);
             }
         } else {
-            Helpers::step('<comment>Pattern does not match expected recursive format:</comment> '.$pattern);
+            Helpers::step('<comment>Pattern does not match expected recursive format:</comment> ' . $pattern);
         }
     }
 
@@ -175,12 +288,21 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
             $fullDirectory = $directory;
         } else {
             // Directory is relative, prepend app path
-            $fullDirectory = $appPath.'/'.$directory;
+            $fullDirectory = $appPath . '/' . $directory;
         }
 
-        $fullPath = $fullDirectory.'/'.$filePattern;
+        $fullPath = $fullDirectory . '/' . $filePattern;
         if ($this->files->exists($fullPath) && $this->files->isDirectory($fullPath)) {
-            Helpers::step('<comment>Removing Ignored Directory:</comment> '.str_replace($appPath.'/', '', $fullPath).'/');
+            $relativePath = str_replace($appPath . '/', '', $fullPath);
+
+            // Check if this path matches a negation pattern
+            if ($this->matchesNegationPattern($relativePath)) {
+                Helpers::step('<comment>Skipping (negated):</comment> ' . $relativePath . '/');
+
+                return;
+            }
+
+            Helpers::step('<comment>Removing Ignored Directory:</comment> ' . $relativePath . '/');
             $this->files->deleteDirectory($fullPath, false);
 
             return;
@@ -204,25 +326,32 @@ class RemoveIgnoredFiles extends BaseRemoveIgnoredFiles
                     ];
                 }
 
-                Helpers::step('<comment>Found '.count($pathsToDelete).' items matching pattern:</comment> '.$filePattern);
+                Helpers::step('<comment>Found ' . count($pathsToDelete) . ' items matching pattern:</comment> ' . $filePattern);
 
-                // Now delete them, checking existence first
+                // Now delete them, checking existence first and negation patterns
                 foreach ($pathsToDelete as $item) {
                     if ($this->files->exists($item['path'])) {
-                        $relativePath = str_replace($appPath.'/', '', $item['path']);
+                        $relativePath = str_replace($appPath . '/', '', $item['path']);
+
+                        // Check if this path matches a negation pattern
+                        if ($this->matchesNegationPattern($relativePath)) {
+                            Helpers::step('<comment>Skipping (negated):</comment> ' . $relativePath);
+
+                            continue;
+                        }
 
                         if ($item['isDir'] && $this->files->isDirectory($item['path'])) {
-                            Helpers::step('<comment>Removing Ignored Directory:</comment> '.$relativePath.'/');
+                            Helpers::step('<comment>Removing Ignored Directory:</comment> ' . $relativePath . '/');
                             $this->files->deleteDirectory($item['path'], false);
-                        } elseif (! $item['isDir'] && $this->files->isFile($item['path'])) {
-                            Helpers::step('<comment>Removing Ignored File:</comment> '.$relativePath);
+                        } elseif (!$item['isDir'] && $this->files->isFile($item['path'])) {
+                            Helpers::step('<comment>Removing Ignored File:</comment> ' . $relativePath);
                             $this->files->delete($item['path']);
                         }
                     }
                 }
             } catch (\Exception $e) {
                 // Skip if directory structure changes during iteration
-                Helpers::step('<comment>Skipping pattern due to directory changes:</comment> '.$directory.'/'.$filePattern);
+                Helpers::step('<comment>Skipping pattern due to directory changes:</comment> ' . $directory . '/' . $filePattern);
             }
         }
     }
