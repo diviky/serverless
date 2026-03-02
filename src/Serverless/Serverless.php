@@ -307,7 +307,17 @@ class Serverless
 
         if (isset($env['web'], $env['web']['targets']) && is_array($env['web']['targets'])) {
             foreach ($env['web']['targets'] as $value) {
-                $resources[Str::studly($value['name'].'-tg')] = self::createTargetGroup('web', $value);
+                $tgLogicalId = Str::studly($value['name'].'-tg');
+                $resources[$tgLogicalId] = self::createTargetGroup('web', $value);
+                $resources['WebLambdaElbInvokePermission'.Str::studly($value['name'])] = [
+                    'Type' => 'AWS::Lambda::Permission',
+                    'Properties' => [
+                        'FunctionName' => ['Fn::GetAtt' => ['WebLambdaFunction', 'Arn']],
+                        'Principal' => 'elasticloadbalancing.amazonaws.com',
+                        'Action' => 'lambda:InvokeFunction',
+                        'SourceArn' => ['Ref' => $tgLogicalId],
+                    ],
+                ];
             }
         }
 
