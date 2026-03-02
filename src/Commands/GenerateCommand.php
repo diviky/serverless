@@ -7,6 +7,7 @@ use Diviky\Serverless\Serverless\Serverless;
 use Laravel\VaporCli\Commands\BuildCommand as VaporBuildCommand;
 use Laravel\VaporCli\Helpers;
 use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputOption;
 
 class GenerateCommand extends VaporBuildCommand
 {
@@ -20,6 +21,8 @@ class GenerateCommand extends VaporBuildCommand
         $this
             ->setName('sls:generate')
             ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
             ->setDescription('Create Serverless file');
     }
 
@@ -28,7 +31,7 @@ class GenerateCommand extends VaporBuildCommand
      */
     public function handle()
     {
-        Serverless::generate($this->argument('environment'));
+        Serverless::generate($this->argument('environment'), $this->option('profile'), $this->option('region'));
 
         Helpers::line();
         Helpers::line('<info>Serverless file created successfully.</info>');

@@ -10,6 +10,20 @@ use Laravel\VaporCli\Helpers;
 
 class ConsoleVaporClient extends VaporConsoleVaporClient
 {
+    protected $profile;
+
+    protected $region;
+
+    public function setProfile($profile)
+    {
+        $this->profile = $profile;
+    }
+
+    public function setRegion($region)
+    {
+        $this->region = $region;
+    }
+
     /**
      * Get all of the providers attached to the account.
      *
@@ -120,20 +134,20 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $bucketName = Manifest::artifactBucket($environment);
         $assetsBucketName = Manifest::bucket($environment);
 
-        $artifactKey = 'releases/' . $uuid . '/';
+        $artifactKey = 'releases/'.$uuid.'/';
 
         // Generate ECR details using AWS profile
         $ecrDetails = $this->generateEcrDetails($repositoryName);
 
         // Generate S3 pre-signed URLs for artifact uploads
         if ($vendorHash) {
-            $vendor_url = $this->generateS3PresignedUrls($bucketName, $artifactKey . 'vendor.zip');
+            $vendor_url = $this->generateS3PresignedUrls($bucketName, $artifactKey.'vendor.zip');
         } else {
             $vendor_url = null;
         }
 
         if ($file) {
-            $artifact_url = $this->generateS3PresignedUrls($bucketName, $artifactKey . 'app.zip');
+            $artifact_url = $this->generateS3PresignedUrls($bucketName, $artifactKey.'app.zip');
         } else {
             $artifact_url = null;
         }
@@ -170,6 +184,10 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function getAwsProfile()
     {
+        if ($this->profile) {
+            return $this->profile;
+        }
+
         $profile = 'default';
 
         try {
@@ -194,6 +212,10 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function getAwsRegion()
     {
+        if ($this->region) {
+            return $this->region;
+        }
+
         try {
             $manifest = Manifest::current();
             if (isset($manifest['provider']['region'])) {
@@ -285,7 +307,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $authResult = $ecrClient->getAuthorizationToken();
         $authData = $authResult['authorizationData'][0] ?? null;
 
-        if (!$authData || empty($authData['authorizationToken'])) {
+        if (! $authData || empty($authData['authorizationToken'])) {
             Helpers::abort('Unable to get ECR authorization token.');
         }
 
@@ -345,7 +367,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return $artifactUrl;
 
         } catch (\Exception $e) {
-            Helpers::abort('Unable to upload deployment artifact to cloud storage. ' . $e->getMessage());
+            Helpers::abort('Unable to upload deployment artifact to cloud storage. '.$e->getMessage());
         }
     }
 
@@ -419,7 +441,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'version' => 'latest',
         ];
 
-        if (!empty($credentials['key']) && !empty($credentials['secret'])) {
+        if (! empty($credentials['key']) && ! empty($credentials['secret'])) {
             $clientConfig['credentials'] = [
                 'key' => $credentials['key'],
                 'secret' => $credentials['secret'],
@@ -513,7 +535,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 }, $parameters);
 
                 foreach ($pathBasedParameters as $pathParam) {
-                    if (!in_array($pathParam['Name'], $existingNames)) {
+                    if (! in_array($pathParam['Name'], $existingNames)) {
                         $parameters[] = $pathParam;
                     }
                 }
@@ -544,7 +566,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return implode("\n", $envVars);
 
         } catch (\Exception $e) {
-            Helpers::abort('Unable to get environment variables from parameter store. ' . $e->getMessage());
+            Helpers::abort('Unable to get environment variables from parameter store. '.$e->getMessage());
         }
     }
 
@@ -669,7 +691,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function resolveSsmReferences($value)
     {
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             return $value;
         }
 
@@ -729,7 +751,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function isJson($string)
     {
-        if (!is_string($string)) {
+        if (! is_string($string)) {
             return false;
         }
 
@@ -818,7 +840,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 }
             }
         } catch (\Exception $e) {
-            Helpers::abort('Unable to update environment variables in parameter store. ' . $e->getMessage());
+            Helpers::abort('Unable to update environment variables in parameter store. '.$e->getMessage());
         }
     }
 
@@ -852,7 +874,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                     $key = trim($parts[0]);
                     $value = trim($parts[1]);
 
-                    if (!empty($key)) {
+                    if (! empty($key)) {
                         $envVars[$key] = $value;
                     }
                 }
@@ -870,7 +892,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             $pairSize = strlen($pair) + 1; // +1 for newline
 
             // If adding this pair would exceed the limit, start a new chunk
-            if ($currentSize + $pairSize > $maxChunkSize && !empty($currentChunk)) {
+            if ($currentSize + $pairSize > $maxChunkSize && ! empty($currentChunk)) {
                 $chunks[] = $currentChunk;
                 $currentChunk = [];
                 $currentSize = 0;
@@ -881,7 +903,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         }
 
         // Add the last chunk
-        if (!empty($currentChunk)) {
+        if (! empty($currentChunk)) {
             $chunks[] = $currentChunk;
         }
 
@@ -958,7 +980,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                                     'Name' => $parameter['Name'],
                                 ]);
                             } catch (\Aws\Exception\AwsException $e) {
-                                Helpers::abort("Failed to delete {$parameter['Name']}: " . $e->getMessage());
+                                Helpers::abort("Failed to delete {$parameter['Name']}: ".$e->getMessage());
                             }
                         }
                     } else {
@@ -970,16 +992,16 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                         } catch (\Aws\Exception\AwsException $e) {
                             // Parameter might not exist, which is okay
                             if ($e->getAwsErrorCode() !== 'ParameterNotFound') {
-                                Helpers::abort("Failed to delete {$path}: " . $e->getMessage());
+                                Helpers::abort("Failed to delete {$path}: ".$e->getMessage());
                             }
                         }
                     }
                 } catch (\Exception $e) {
-                    Helpers::abort("Error processing path {$path}: " . $e->getMessage());
+                    Helpers::abort("Error processing path {$path}: ".$e->getMessage());
                 }
             }
         } catch (\Exception $e) {
-            Helpers::abort('Failed to delete environment. ' . $e->getMessage());
+            Helpers::abort('Failed to delete environment. '.$e->getMessage());
         }
     }
 
@@ -1026,7 +1048,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return $secrets;
 
         } catch (\Exception $e) {
-            Helpers::abort('Unable to get secrets from parameter store. ' . $e->getMessage());
+            Helpers::abort('Unable to get secrets from parameter store. '.$e->getMessage());
         }
     }
 
@@ -1073,7 +1095,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 'Description' => "Secret '{$name}' for {$projectId}/{$environment}",
             ]);
         } catch (\Exception $e) {
-            Helpers::abort('Unable to store secret in parameter store. ' . $e->getMessage());
+            Helpers::abort('Unable to store secret in parameter store. '.$e->getMessage());
         }
     }
 
@@ -1099,11 +1121,11 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
 
         } catch (\Aws\Exception\AwsException $e) {
             if ($e->getAwsErrorCode() !== 'ParameterNotFound') {
-                Helpers::abort('Unable to delete secret from parameter store. ' . $e->getMessage());
+                Helpers::abort('Unable to delete secret from parameter store. '.$e->getMessage());
             }
             // If parameter not found, consider it already deleted (success)
         } catch (\Exception $e) {
-            Helpers::abort('Unable to delete secret from parameter store. ' . $e->getMessage());
+            Helpers::abort('Unable to delete secret from parameter store. '.$e->getMessage());
         }
     }
 }

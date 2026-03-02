@@ -4,12 +4,11 @@ namespace Diviky\Serverless\Commands;
 
 use Diviky\Serverless\Concerns\ExecuteTrait;
 use Diviky\Serverless\Serverless\Serverless;
-use Laravel\VaporCli\Commands\DeployCommand as VaporDeployCommand;
 use Laravel\VaporCli\Helpers;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 
-class SlsCommand extends VaporDeployCommand
+class SlsCommand extends DeployCommand
 {
     use ExecuteTrait;
 
@@ -25,6 +24,8 @@ class SlsCommand extends VaporDeployCommand
             ->addOption('build-arg', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build argument')
             ->addOption('build-option', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build option')
             ->addOption('debug', null, InputOption::VALUE_OPTIONAL, 'Deploy with debug mode enabled', 'unset')
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
             ->setDescription('Deploy an environment');
     }
 
@@ -34,7 +35,7 @@ class SlsCommand extends VaporDeployCommand
 
         Helpers::line();
 
-        Serverless::generate($environment);
+        Serverless::generate($environment, $this->option('profile'), $this->option('region'));
         Serverless::deploy();
 
         return $artifact;

@@ -4,6 +4,7 @@ namespace Diviky\Serverless\Commands;
 
 use DateTime;
 use Diviky\Serverless\BuildProcess\BuildContainerImage;
+use Diviky\Serverless\BuildProcess\CollectAndEncryptEnv;
 use Diviky\Serverless\BuildProcess\CollectSecrets;
 use Diviky\Serverless\BuildProcess\CompressApplication;
 use Diviky\Serverless\BuildProcess\ConfigureArtisan;
@@ -11,6 +12,7 @@ use Diviky\Serverless\BuildProcess\ConfigureIndex;
 use Diviky\Serverless\BuildProcess\CopyApplicationToBuildPath;
 use Diviky\Serverless\BuildProcess\ExecuteBuildCommands;
 use Diviky\Serverless\BuildProcess\ExtractAssetsToSeparateDirectory;
+use Diviky\Serverless\BuildProcess\ModifyFiles;
 use Diviky\Serverless\BuildProcess\PackageApplication;
 use Diviky\Serverless\BuildProcess\RemoveIgnoredFiles;
 use Diviky\Serverless\Concerns\ExecuteTrait;
@@ -52,6 +54,8 @@ class BuildCommand extends VaporBuildCommand
             ->addOption('build-arg', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build argument')
             ->addOption('build-option', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build option')
             ->addOption('docker-build', null, InputOption::VALUE_NEGATABLE, 'Docker build command', true)
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
             ->setDescription('Build the project archive');
     }
 
@@ -88,8 +92,10 @@ class BuildCommand extends VaporBuildCommand
             new ExtractAssetsToSeparateDirectory($this->argument('environment')),
             new InjectHandlers($this->argument('environment')),
             new CollectSecrets($this->argument('environment')),
+            new CollectAndEncryptEnv($this->argument('environment')),
             new InjectErrorPages,
             new InjectRdsCertificate,
+            new ModifyFiles($this->argument('environment')),
             new ExtractVendorToSeparateDirectory($this->argument('environment')),
             new CompressApplication($this->argument('environment')),
             new CompressVendor($this->argument('environment')),
