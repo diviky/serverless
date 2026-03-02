@@ -24,6 +24,7 @@ class SlsCommand extends DeployCommand
             ->addOption('build-arg', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build argument')
             ->addOption('build-option', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build option')
             ->addOption('debug', null, InputOption::VALUE_OPTIONAL, 'Deploy with debug mode enabled', 'unset')
+            ->addOption('docker-build', null, InputOption::VALUE_NEGATABLE, 'Docker build command', true)
             ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
             ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
             ->setDescription('Deploy an environment');
