@@ -36,7 +36,7 @@ environments:
     #entry-point: null #Specifies the entry point array to their application, which is typically the location of the runtime executable.
     #working-dir: /var/task
     copy-env: true # copy the environments from the .env file
-    environment:
+    env:
       #- APP_CONFIG_CACHE=/mnt/local/storage/bootstrap/cache/config.php
     assets: com-diviky.ap-south-1.assets
     asset-bucket: true # create aws bucket

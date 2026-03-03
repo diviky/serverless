@@ -37,7 +37,7 @@ class ModifyFiles
                 '$this->app->basePath($this->encryptedFile),',
             ],
             [
-                'isset($_ENV[\'ENV_ENCRYPTED_FILE_PATH\']) ? $_ENV[\'ENV_ENCRYPTED_FILE_PATH\'].\'/$this->encryptedFile\' : $this->app->basePath($this->encryptedFile),',
+                'isset($_ENV[\'ENV_ENCRYPTED_FILE_PATH\']) ? $_ENV[\'ENV_ENCRYPTED_FILE_PATH\'].\'/\'.$this->encryptedFile : $this->app->basePath($this->encryptedFile),',
             ],
             file_get_contents($file)
         );
