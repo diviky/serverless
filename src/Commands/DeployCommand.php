@@ -27,7 +27,7 @@ class DeployCommand extends VaporDeployCommand
     {
         $this
             ->setName('deploy')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
             ->addOption('commit', null, InputOption::VALUE_OPTIONAL, 'The commit hash that is being deployed')
             ->addOption('message', null, InputOption::VALUE_OPTIONAL, 'The message for the commit that is being deployed')
             ->addOption('without-waiting', null, InputOption::VALUE_NONE, 'Deploy without waiting for progress')
@@ -36,8 +36,8 @@ class DeployCommand extends VaporDeployCommand
             ->addOption('build-option', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build option')
             ->addOption('debug', null, InputOption::VALUE_OPTIONAL, 'Deploy with debug mode enabled', 'unset')
             ->addOption('docker-build', null, InputOption::VALUE_NEGATABLE, 'Docker build command', true)
-            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
-            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', null)
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', null)
             ->setDescription('Build and Deploy an environment to cloud provider');
     }
 
@@ -52,7 +52,7 @@ class DeployCommand extends VaporDeployCommand
 
         $this->call('build', [
             'environment' => $this->argument('environment'),
-            '--asset-url' => $this->assetDomain($project).'/'.$uuid,
+            '--asset-url' => $this->assetDomain($project) . '/' . $uuid,
             '--manifest' => Path::manifest(),
             '--build-arg' => $this->option('build-arg'),
             '--build-option' => $this->option('build-option'),
@@ -93,8 +93,8 @@ class DeployCommand extends VaporDeployCommand
         $usesContainerImage = Manifest::usesContainerImage($environment);
         $usesContainerImage = $usesContainerImage && $this->option('docker-build') !== false;
 
-        if (! $usesContainerImage) {
-            Helpers::step('<comment>Uploading Deployment Artifact</comment> ('.Helpers::megabytes(Path::artifact()).')');
+        if (!$usesContainerImage) {
+            Helpers::step('<comment>Uploading Deployment Artifact</comment> (' . Helpers::megabytes(Path::artifact()) . ')');
         }
 
         $artifact = $this->vapor->createArtifact(
@@ -112,7 +112,7 @@ class DeployCommand extends VaporDeployCommand
         if (isset($artifact['vendor_url'])) {
             Helpers::line();
 
-            Helpers::step('<comment>Uploading Vendor Directory</comment> ('.Helpers::megabytes(Path::vendorArtifact()).')');
+            Helpers::step('<comment>Uploading Vendor Directory</comment> (' . Helpers::megabytes(Path::vendorArtifact()) . ')');
 
             Helpers::app(AwsStorageProvider::class)->store($artifact['vendor_url'], [], Path::vendorArtifact(), true);
         }

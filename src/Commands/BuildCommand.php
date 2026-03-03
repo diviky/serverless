@@ -49,13 +49,13 @@ class BuildCommand extends VaporBuildCommand
     {
         $this
             ->setName('build')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
             ->addOption('asset-url', null, InputOption::VALUE_OPTIONAL, 'The asset base URL')
             ->addOption('build-arg', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build argument')
             ->addOption('build-option', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build option')
             ->addOption('docker-build', null, InputOption::VALUE_NEGATABLE, 'Docker build command', true)
-            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
-            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', null)
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', null)
             ->setDescription('Build the project archive');
     }
 

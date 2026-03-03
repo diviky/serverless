@@ -16,7 +16,7 @@ class SlsCommand extends DeployCommand
     {
         $this
             ->setName('sls:deploy')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
             ->addOption('commit', null, InputOption::VALUE_OPTIONAL, 'The commit hash that is being deployed')
             ->addOption('message', null, InputOption::VALUE_OPTIONAL, 'The message for the commit that is being deployed')
             ->addOption('without-waiting', null, InputOption::VALUE_NONE, 'Deploy without waiting for progress')
@@ -25,8 +25,8 @@ class SlsCommand extends DeployCommand
             ->addOption('build-option', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Docker build option')
             ->addOption('debug', null, InputOption::VALUE_OPTIONAL, 'Deploy with debug mode enabled', 'unset')
             ->addOption('docker-build', null, InputOption::VALUE_NEGATABLE, 'Docker build command', true)
-            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
-            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', null)
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', null)
             ->setDescription('Deploy an environment');
     }
 

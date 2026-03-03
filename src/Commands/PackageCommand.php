@@ -21,7 +21,7 @@ class PackageCommand extends VaporBuildCommand
     {
         $this
             ->setName('package')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
             ->setDescription('Package the application based on manifest configuration');
     }
 

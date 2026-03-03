@@ -20,9 +20,9 @@ class GenerateCommand extends VaporBuildCommand
     {
         $this
             ->setName('sls:generate')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
-            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', 'default')
-            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', 'ap-south-1')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', null)
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', null)
             ->setDescription('Create Serverless file');
     }
 

@@ -22,7 +22,7 @@ class PushCommand extends VaporBuildCommand
     {
         $this
             ->setName('sls:push')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'staging')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
             ->addArgument('args', InputArgument::OPTIONAL, 'Extra arguments for sls')
             ->setDescription('Deploy the Serverless file');
     }

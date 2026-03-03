@@ -19,7 +19,7 @@ class ArtifactCommand extends DeployCommand
     {
         $this
             ->setName('artifact')
-            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name')
+            ->addArgument('environment', InputArgument::OPTIONAL, 'The environment name', 'production')
             ->addOption('commit', null, InputOption::VALUE_OPTIONAL, 'The commit hash that is being deployed')
             ->addOption('message', null, InputOption::VALUE_OPTIONAL, 'The message for the commit that is being deployed')
             ->addOption('without-waiting', null, InputOption::VALUE_NONE, 'Deploy without waiting for progress')
