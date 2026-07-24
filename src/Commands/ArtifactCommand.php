@@ -25,6 +25,9 @@ class ArtifactCommand extends DeployCommand
             ->addOption('without-waiting', null, InputOption::VALUE_NONE, 'Deploy without waiting for progress')
             ->addOption('fresh-assets', null, InputOption::VALUE_NONE, 'Upload a fresh copy of all assets')
             ->addOption('debug', null, InputOption::VALUE_OPTIONAL, 'Deploy with debug mode enabled', 'unset')
+            ->addOption('docker-build', null, InputOption::VALUE_NEGATABLE, 'Docker build command', true)
+            ->addOption('profile', null, InputOption::VALUE_OPTIONAL, 'AWS profile', null)
+            ->addOption('region', null, InputOption::VALUE_OPTIONAL, 'AWS region', null)
             ->setDescription('Deploy an environment');
     }
 

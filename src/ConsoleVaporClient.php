@@ -2,6 +2,11 @@
 
 namespace Diviky\Serverless;
 
+use Aws\Ecr\EcrClient;
+use Aws\Exception\AwsException;
+use Aws\S3\S3Client;
+use Aws\Ssm\SsmClient;
+use Aws\Sts\StsClient;
 use GuzzleHttp\Exception\ClientException;
 use Illuminate\Support\Str;
 use Laravel\VaporCli\Aws\AwsStorageProvider;
@@ -48,7 +53,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         return [
             'cloudfront_status' => '',
             'id' => $projectId,
-            'uuid' => (string) Str::uuid(),
+            'uuid' => (string) Str::uuid7(),
             'asset_domains' => [
                 's3' => 'https://s3.com/',
             ],
@@ -134,20 +139,20 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $bucketName = Manifest::artifactBucket($environment);
         $assetsBucketName = Manifest::bucket($environment);
 
-        $artifactKey = 'releases/'.$uuid.'/';
+        $artifactKey = 'releases/' . $uuid . '/';
 
         // Generate ECR details using AWS profile
         $ecrDetails = $this->generateEcrDetails($repositoryName);
 
         // Generate S3 pre-signed URLs for artifact uploads
         if ($vendorHash) {
-            $vendor_url = $this->generateS3PresignedUrls($bucketName, $artifactKey.'vendor.zip');
+            $vendor_url = $this->generateS3PresignedUrls($bucketName, $artifactKey . 'vendor.zip');
         } else {
             $vendor_url = null;
         }
 
         if ($file) {
-            $artifact_url = $this->generateS3PresignedUrls($bucketName, $artifactKey.'app.zip');
+            $artifact_url = $this->generateS3PresignedUrls($bucketName, $artifactKey . 'app.zip');
         } else {
             $artifact_url = null;
         }
@@ -278,7 +283,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create STS client to get account ID
-        $stsClient = new \Aws\Sts\StsClient($clientConfig);
+        $stsClient = new StsClient($clientConfig);
 
         // Get AWS Account ID
         $identity = $stsClient->getCallerIdentity();
@@ -292,14 +297,14 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $repositoryUri = "{$accountId}.dkr.ecr.{$credentials['region']}.amazonaws.com/{$repositoryName}";
 
         // Create ECR client
-        $ecrClient = new \Aws\Ecr\EcrClient($clientConfig);
+        $ecrClient = new EcrClient($clientConfig);
 
         // Create ECR repository if it doesn't exist
         try {
             $ecrClient->createRepository([
                 'repositoryName' => $repositoryName,
             ]);
-        } catch (\Aws\Exception\AwsException $e) {
+        } catch (AwsException $e) {
             // Repository might already exist, ignore error
         }
 
@@ -307,7 +312,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $authResult = $ecrClient->getAuthorizationToken();
         $authData = $authResult['authorizationData'][0] ?? null;
 
-        if (! $authData || empty($authData['authorizationToken'])) {
+        if (!$authData || empty($authData['authorizationToken'])) {
             Helpers::abort('Unable to get ECR authorization token.');
         }
 
@@ -337,12 +342,12 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             $clientConfig = $this->getAwsClientConfig();
 
             // Create S3 client
-            $s3Client = new \Aws\S3\S3Client($clientConfig);
+            $s3Client = new S3Client($clientConfig);
 
             // Check if bucket exists, create if it doesn't
             try {
                 $s3Client->headBucket(['Bucket' => $bucketName]);
-            } catch (\Aws\Exception\AwsException $e) {
+            } catch (AwsException $e) {
                 // Bucket doesn't exist, create it
                 try {
                     $s3Client->createBucket([
@@ -351,7 +356,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                             'LocationConstraint' => $credentials['region'] !== 'us-east-1' ? $credentials['region'] : null,
                         ],
                     ]);
-                } catch (\Aws\Exception\AwsException $e) {
+                } catch (AwsException $e) {
                     // Handle bucket creation error
                 }
             }
@@ -367,7 +372,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return $artifactUrl;
 
         } catch (\Exception $e) {
-            Helpers::abort('Unable to upload deployment artifact to cloud storage. '.$e->getMessage());
+            Helpers::abort('Unable to upload deployment artifact to cloud storage. ' . $e->getMessage());
         }
     }
 
@@ -441,7 +446,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             'version' => 'latest',
         ];
 
-        if (! empty($credentials['key']) && ! empty($credentials['secret'])) {
+        if (!empty($credentials['key']) && !empty($credentials['secret'])) {
             $clientConfig['credentials'] = [
                 'key' => $credentials['key'],
                 'secret' => $credentials['secret'],
@@ -466,7 +471,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create SSM client
-        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+        $ssmClient = new SsmClient($clientConfig);
 
         // Build parameter path based on project and environment
         $parameterPath = "/{$projectId}/{$environment}/variables";
@@ -486,7 +491,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 if (isset($result['Parameter'])) {
                     $parameters[] = $result['Parameter'];
                 }
-            } catch (\Aws\Exception\AwsException $e) {
+            } catch (AwsException $e) {
                 // Parameter not found at specific path, continue
             }
 
@@ -515,13 +520,13 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                                 if (isset($chunkResult['Parameter'])) {
                                     $parameters[] = $chunkResult['Parameter'];
                                 }
-                            } catch (\Aws\Exception\AwsException $e) {
+                            } catch (AwsException $e) {
                                 // Continue if chunk not found
                             }
                         }
                     }
                 }
-            } catch (\Aws\Exception\AwsException $e) {
+            } catch (AwsException $e) {
                 // No metadata found, continue with regular retrieval
             }
 
@@ -535,7 +540,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 }, $parameters);
 
                 foreach ($pathBasedParameters as $pathParam) {
-                    if (! in_array($pathParam['Name'], $existingNames)) {
+                    if (!in_array($pathParam['Name'], $existingNames)) {
                         $parameters[] = $pathParam;
                     }
                 }
@@ -566,7 +571,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return implode("\n", $envVars);
 
         } catch (\Exception $e) {
-            Helpers::abort('Unable to get environment variables from parameter store. '.$e->getMessage());
+            Helpers::abort('Unable to get environment variables from parameter store. ' . $e->getMessage());
         }
     }
 
@@ -691,7 +696,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function resolveSsmReferences($value)
     {
-        if (! is_string($value)) {
+        if (!is_string($value)) {
             return $value;
         }
 
@@ -706,7 +711,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 $clientConfig = $this->getAwsClientConfig();
 
                 // Create SSM client
-                $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+                $ssmClient = new SsmClient($clientConfig);
 
                 // Parse path and version if provided
                 $pathParts = explode(':', $ssmPath);
@@ -751,7 +756,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
      */
     protected function isJson($string)
     {
-        if (! is_string($string)) {
+        if (!is_string($string)) {
             return false;
         }
 
@@ -763,7 +768,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
     /**
      * Get parameters from AWS Parameter Store by path.
      *
-     * @param  \Aws\Ssm\SsmClient  $ssmClient
+     * @param  SsmClient  $ssmClient
      * @param  string  $path
      * @return array
      */
@@ -806,7 +811,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create SSM client
-        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+        $ssmClient = new SsmClient($clientConfig);
 
         // Build parameter path based on project and environment
         $parameterPath = "/{$projectId}/{$environment}/variables";
@@ -840,14 +845,14 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 }
             }
         } catch (\Exception $e) {
-            Helpers::abort('Unable to update environment variables in parameter store. '.$e->getMessage());
+            Helpers::abort('Unable to update environment variables in parameter store. ' . $e->getMessage());
         }
     }
 
     /**
      * Store large variable sets by splitting into multiple parameters.
      *
-     * @param  \Aws\Ssm\SsmClient  $ssmClient
+     * @param  SsmClient  $ssmClient
      * @param  string  $projectId
      * @param  string  $environment
      * @param  string  $variables
@@ -874,7 +879,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                     $key = trim($parts[0]);
                     $value = trim($parts[1]);
 
-                    if (! empty($key)) {
+                    if (!empty($key)) {
                         $envVars[$key] = $value;
                     }
                 }
@@ -892,7 +897,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             $pairSize = strlen($pair) + 1; // +1 for newline
 
             // If adding this pair would exceed the limit, start a new chunk
-            if ($currentSize + $pairSize > $maxChunkSize && ! empty($currentChunk)) {
+            if ($currentSize + $pairSize > $maxChunkSize && !empty($currentChunk)) {
                 $chunks[] = $currentChunk;
                 $currentChunk = [];
                 $currentSize = 0;
@@ -903,7 +908,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         }
 
         // Add the last chunk
-        if (! empty($currentChunk)) {
+        if (!empty($currentChunk)) {
             $chunks[] = $currentChunk;
         }
 
@@ -959,7 +964,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create SSM client
-        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+        $ssmClient = new SsmClient($clientConfig);
 
         try {
             // Build parameter paths to delete
@@ -979,8 +984,8 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                                 $ssmClient->deleteParameter([
                                     'Name' => $parameter['Name'],
                                 ]);
-                            } catch (\Aws\Exception\AwsException $e) {
-                                Helpers::abort("Failed to delete {$parameter['Name']}: ".$e->getMessage());
+                            } catch (AwsException $e) {
+                                Helpers::abort("Failed to delete {$parameter['Name']}: " . $e->getMessage());
                             }
                         }
                     } else {
@@ -989,19 +994,19 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                             $ssmClient->deleteParameter([
                                 'Name' => $path,
                             ]);
-                        } catch (\Aws\Exception\AwsException $e) {
+                        } catch (AwsException $e) {
                             // Parameter might not exist, which is okay
                             if ($e->getAwsErrorCode() !== 'ParameterNotFound') {
-                                Helpers::abort("Failed to delete {$path}: ".$e->getMessage());
+                                Helpers::abort("Failed to delete {$path}: " . $e->getMessage());
                             }
                         }
                     }
                 } catch (\Exception $e) {
-                    Helpers::abort("Error processing path {$path}: ".$e->getMessage());
+                    Helpers::abort("Error processing path {$path}: " . $e->getMessage());
                 }
             }
         } catch (\Exception $e) {
-            Helpers::abort('Failed to delete environment. '.$e->getMessage());
+            Helpers::abort('Failed to delete environment. ' . $e->getMessage());
         }
     }
 
@@ -1018,7 +1023,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create SSM client
-        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+        $ssmClient = new SsmClient($clientConfig);
 
         // Build secrets path based on project and environment
         $secretsPath = "/{$projectId}/{$environment}/secrets/";
@@ -1048,7 +1053,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
             return $secrets;
 
         } catch (\Exception $e) {
-            Helpers::abort('Unable to get secrets from parameter store. '.$e->getMessage());
+            Helpers::abort('Unable to get secrets from parameter store. ' . $e->getMessage());
         }
     }
 
@@ -1067,7 +1072,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create SSM client
-        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+        $ssmClient = new SsmClient($clientConfig);
 
         // Build secret parameter path
         $secretPath = "/{$projectId}/{$environment}/secrets/{$name}";
@@ -1095,7 +1100,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 'Description' => "Secret '{$name}' for {$projectId}/{$environment}",
             ]);
         } catch (\Exception $e) {
-            Helpers::abort('Unable to store secret in parameter store. '.$e->getMessage());
+            Helpers::abort('Unable to store secret in parameter store. ' . $e->getMessage());
         }
     }
 
@@ -1111,7 +1116,7 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
         $clientConfig = $this->getAwsClientConfig();
 
         // Create SSM client
-        $ssmClient = new \Aws\Ssm\SsmClient($clientConfig);
+        $ssmClient = new SsmClient($clientConfig);
 
         try {
             // Delete the secret parameter
@@ -1119,13 +1124,13 @@ class ConsoleVaporClient extends VaporConsoleVaporClient
                 'Name' => $secretId, // secretId is the full parameter path
             ]);
 
-        } catch (\Aws\Exception\AwsException $e) {
+        } catch (AwsException $e) {
             if ($e->getAwsErrorCode() !== 'ParameterNotFound') {
-                Helpers::abort('Unable to delete secret from parameter store. '.$e->getMessage());
+                Helpers::abort('Unable to delete secret from parameter store. ' . $e->getMessage());
             }
             // If parameter not found, consider it already deleted (success)
         } catch (\Exception $e) {
-            Helpers::abort('Unable to delete secret from parameter store. '.$e->getMessage());
+            Helpers::abort('Unable to delete secret from parameter store. ' . $e->getMessage());
         }
     }
 }
