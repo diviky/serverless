@@ -18,7 +18,7 @@ class PushCommand extends VaporBuildCommand
     /**
      * Configure the command options.
      */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('sls:push')

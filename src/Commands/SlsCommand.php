@@ -12,7 +12,7 @@ class SlsCommand extends DeployCommand
 {
     use ExecuteTrait;
 
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('sls:deploy')

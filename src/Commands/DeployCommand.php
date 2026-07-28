@@ -20,10 +20,8 @@ class DeployCommand extends VaporDeployCommand
 
     /**
      * Configure the command options.
-     *
-     * @return void
      */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('deploy')

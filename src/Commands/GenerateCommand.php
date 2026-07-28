@@ -16,7 +16,7 @@ class GenerateCommand extends VaporBuildCommand
     /**
      * Configure the command options.
      */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('sls:generate')

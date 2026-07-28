@@ -17,7 +17,7 @@ class PackageCommand extends VaporBuildCommand
     /**
      * Configure the command options.
      */
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('package')
